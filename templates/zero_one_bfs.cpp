@@ -1,133 +1,157 @@
 #include <bits/stdc++.h>
 using namespace std;
+using ll = long long;
+#define rep(i, n) for (ll i = 0; i < (ll)(n); i++)
+#define pb push_back
 
 /* =========================================================================
-   [01-BFS (コスト 0/1 の最短路アルゴリズム)]
-   ・辺の重みが 0 または 1 のみの場合、deque を使うことで O(V + E) で解ける。
-   ・コスト 0 の遷移は push_front()、コスト 1 の遷移は push_back()。
-   ・ダイクストラの O((V + E) log V) より圧倒的に高速。
+   [01-BFS - 直書き用テンプレート]
+   ・ダイクストラ (1.cpp) と同じ変数名・雰囲気 (todo, dist, c, t, w, i)
+   ・重みが 0 と 1 のみの場合、deque を使って O(V + E) で高速に解く。
+   ・コスト 0 は push_front、コスト 1 は push_back。
    ========================================================================= */
 
-// ==================== [コピペここから: グラフ版 01-BFS] ====================
-struct Edge01 {
-    int to;
-    int cost; // 0 or 1
-};
+// ==================== [コピペここから: 通常のグラフ] ====================
+/*
+// グラフの用意 (重み w: 0 or 1, 行き先 i)
+vector<vector<pair<ll, ll>>> g(n);
+// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({w, v}); g[v].pb({w, u}); }
 
-const int INF_01 = 1e9;
+// 01-BFS (始点 s)
+deque<pair<ll, int>> todo;
+todo.push_back({0, s});
+vector<ll> dist(n, -1);
 
-struct ZeroOneBFS {
-    int n;
-    vector<vector<Edge01>> g;
-    vector<int> dist;
-    vector<int> prev;
-
-    ZeroOneBFS(int n) : n(n), g(n), dist(n, INF_01), prev(n, -1) {}
-
-    void add_edge(int from, int to, int cost) {
-        g[from].push_back({to, cost});
+while (!todo.empty()) {
+  auto [c, t] = todo.front();
+  todo.pop_front();
+  if (dist[t] != -1) {
+    continue;
+  }
+  dist[t] = c;
+  for (auto [w, i] : g[t]) {
+    if (dist[i] == -1) {
+      if (w == 0) {
+        todo.push_front({c, i});
+      } else {
+        todo.push_back({c + 1, i});
+      }
     }
-
-    void build(int start) {
-        dist.assign(n, INF_01);
-        prev.assign(n, -1);
-        deque<int> deq;
-
-        dist[start] = 0;
-        deq.push_back(start);
-
-        while (!deq.empty()) {
-            int u = deq.front();
-            deq.pop_front();
-
-            for (const auto& e : g[u]) {
-                if (dist[e.to] > dist[u] + e.cost) {
-                    dist[e.to] = dist[u] + e.cost;
-                    prev[e.to] = u;
-                    if (e.cost == 0) {
-                        deq.push_front(e.to); // コスト0は最優先で展開
-                    } else {
-                        deq.push_back(e.to);  // コスト1は後ろに追加
-                    }
-                }
-            }
-        }
-    }
-
-    // 経路復元
-    vector<int> get_path(int goal) {
-        if (dist[goal] == INF_01) return {};
-        vector<int> path;
-        for (int cur = goal; cur != -1; cur = prev[cur]) path.push_back(cur);
-        reverse(path.begin(), path.end());
-        return path;
-    }
-};
-// ==================== [コピペここまで: グラフ版] ====================
-
-
-// ==================== [コピペここから: グリッド版 01-BFS] ====================
-// 例: '.' はコスト0で移動可能, '#' は壁を壊すコスト1で移動可能
-vector<vector<int>> grid_01bfs(int h, int w, int start_r, int start_c,
-                               const vector<string>& grid) {
-    const vector<int> dr = {0, 0, 1, -1};
-    const vector<int> dc = {1, -1, 0, 0};
-    vector<vector<int>> dist(h, vector<int>(w, INF_01));
-    deque<pair<int, int>> deq;
-
-    dist[start_r][start_c] = 0;
-    deq.push_back({start_r, start_c});
-
-    while (!deq.empty()) {
-        auto [r, c] = deq.front();
-        deq.pop_front();
-
-        for (int k = 0; k < 4; k++) {
-            int nr = r + dr[k], nc = c + dc[k];
-            if (nr < 0 || nr >= h || nc < 0 || nc >= w) continue;
-
-            int cost = (grid[nr][nc] == '#' ? 1 : 0);
-            if (dist[nr][nc] > dist[r][c] + cost) {
-                dist[nr][nc] = dist[r][c] + cost;
-                if (cost == 0) deq.push_front({nr, nc});
-                else deq.push_back({nr, nc});
-            }
-        }
-    }
-    return dist;
+  }
 }
+*/
+// ==================== [コピペここまで: 通常のグラフ] ====================
+
+
+// ==================== [コピペここから: 経路復元付き] ====================
+/*
+vector<int> prev_node(n, -1);
+deque<pair<ll, int>> todo;
+todo.push_back({0, s});
+vector<ll> dist(n, -1);
+
+while (!todo.empty()) {
+  auto [c, t] = todo.front();
+  todo.pop_front();
+  if (dist[t] != -1) {
+    continue;
+  }
+  dist[t] = c;
+  for (auto [w, i] : g[t]) {
+    if (dist[i] == -1) {
+      prev_node[i] = t;
+      if (w == 0) {
+        todo.push_front({c, i});
+      } else {
+        todo.push_back({c + 1, i});
+      }
+    }
+  }
+}
+
+// goal への経路復元 (s -> ... -> goal)
+vector<int> path;
+for (int cur = goal; cur != -1; cur = prev_node[cur]) path.pb(cur);
+reverse(path.begin(), path.end());
+*/
+// ==================== [コピペここまで: 経路復元付き] ====================
+
+
+// ==================== [コピペここから: グリッド版 (例: 壁破壊/ワープ)] ====================
+/*
+const vector<int> dx = {1, 0, -1, 0};
+const vector<int> dy = {0, 1, 0, -1};
+
+// {コスト, {x, y}}
+deque<pair<ll, pair<int, int>>> todo;
+todo.push_back({0, {sx, sy}});
+vector<vector<ll>> dist(h, vector<ll>(w, -1));
+
+while (!todo.empty()) {
+  auto [c, pos] = todo.front();
+  auto [x, y] = pos;
+  todo.pop_front();
+  if (dist[x][y] != -1) {
+    continue;
+  }
+  dist[x][y] = c;
+
+  rep(k, 4) {
+    int nx = x + dx[k], ny = y + dy[k];
+    if (nx < 0 || nx >= h || ny < 0 || ny >= w) continue;
+    if (dist[nx][ny] == -1) {
+      // 例: 通路 '.' ならコスト 0、壁 '#' を壊すならコスト 1
+      if (grid[nx][ny] == '.') {
+        todo.push_front({c, {nx, ny}});
+      } else {
+        todo.push_back({c + 1, {nx, ny}});
+      }
+    }
+  }
+}
+*/
 // ==================== [コピペここまで: グリッド版] ====================
 
 
 // --- 動作確認テスト ---
 int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
 
-    // 頂点 4 個のグラフ
-    ZeroOneBFS bfs(4);
-    bfs.add_edge(0, 1, 1);
-    bfs.add_edge(0, 2, 0);
-    bfs.add_edge(2, 3, 0);
-    bfs.add_edge(1, 3, 0);
+  int n = 4;
+  vector<vector<pair<ll, ll>>> g(n);
+  // 0 -> 1 (w=1), 0 -> 2 (w=0), 2 -> 3 (w=0), 1 -> 3 (w=0)
+  g[0].pb({1, 1});
+  g[0].pb({0, 2});
+  g[2].pb({0, 3});
+  g[1].pb({0, 3});
 
-    bfs.build(0);
+  int s = 0;
+  deque<pair<ll, int>> todo;
+  todo.push_back({0, s});
+  vector<ll> dist(n, -1);
 
-    cout << "=== 01-BFS Test Output ===" << "\n";
-    cout << "Dist to 3: " << bfs.dist[3] << "\n"; // 0 -> 2 -> 3 (cost 0)
-    auto path = bfs.get_path(3);
-    cout << "Path to 3: ";
-    for (int v : path) cout << v << " ";
-    cout << "\n";
+  while (!todo.empty()) {
+    auto [c, t] = todo.front();
+    todo.pop_front();
+    if (dist[t] != -1) {
+      continue;
+    }
+    dist[t] = c;
+    for (auto [w, i] : g[t]) {
+      if (dist[i] == -1) {
+        if (w == 0) {
+          todo.push_front({c, i});
+        } else {
+          todo.push_back({c + 1, i});
+        }
+      }
+    }
+  }
 
-    // グリッドテスト (3x3)
-    vector<string> grid = {
-        ".#.",
-        "#.#",
-        "..#"
-    };
-    auto gdist = grid_01bfs(3, 3, 0, 0, grid);
-    cout << "Grid dist to (2, 2): " << gdist[2][2] << "\n";
-
-    return 0;
+  cout << "=== 01-BFS Test Output ===" << "\n";
+  rep(i, n) {
+    cout << "dist to " << i << " = " << dist[i] << "\n";
+  }
+  return 0;
 }

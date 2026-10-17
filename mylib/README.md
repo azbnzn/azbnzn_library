@@ -1687,21 +1687,26 @@ private:
 ---
 
 #### OrderStatisticSet (順序付き集合)
-Treap による平衡二分探索木です。重複要素を扱える multiset 版として動作し、値からインデックス、インデックスから値を高速に取得できます。
+Treap による平衡二分探索木です。重複要素を持たない `set`（一意な集合）として動作し、値からインデックス、インデックスから値を高速に取得できます。
 - **ファイル**: `mylib/OrderStatisticSet.hpp`（短縮エイリアス: `OSS<T>`）
 - **計算量**: 挿入・削除・検索・$k$ 番目取得 いずれも $O(\log N)$
 
 ```cpp
 #include "mylib/OrderStatisticSet.hpp"
 
-OrderStatisticSet<long long> oss;
+OrderStatisticSet<long long> oss; // または短縮形: OSS<long long> oss;
 oss.insert(10);
 oss.insert(20);
-oss.insert(10); // 重複値もOK
+oss.insert(30);
+oss.insert(10); // 既に存在するため挿入されず false を返す (set と同様)
 
-int cnt = oss.order_of_key(15); // 15 未満の要素数
-long long val = oss.kth(0);      // 昇順 0 番目 (最小値) の要素を取得
-oss.erase_one(10);               // 10 を 1 つ削除
+int cnt = oss.get_index(15);                   // 15 未満の要素数 (ここでは 10 の 1 個)
+const long long *val = oss.get_from_bottom(0); // 昇順 0 番目 (最小値: 10) のポインタ
+const long long *top = oss.get_from_top(0);    // 降順 0 番目 (最大値: 30) のポインタ
+oss.erase(10);                                 // 10 を削除 (存在すれば true)
+
+// multiset (重複要素) として使いたい場合は pair<T, int> {値, 一意なID} を使用
+OSS<pair<long long, int>> ms;
 ```
 
 <details>

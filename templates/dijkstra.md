@@ -1,124 +1,111 @@
 # ダイクストラ法 (Dijkstra)
 
-辺の重みが非負であるグラフにおいて、単一の始点から他のすべての頂点への最短距離を求めるアルゴリズムです。
+辺の重みが非負であるグラフにおいて、単一始点から他のすべての頂点への最短距離を求めるアルゴリズムです。  
+構造体を作らず、`solve()` / `main()` 内にそのまま貼り付けて使える直書きテンプレートです。
 
 ---
 
-## 1. 概要・いつ使うか
+## 1. 概要・特徴
 - **計算量**: $O((V + E) \log V)$
-- **使える条件**: すべての辺の重み（コスト）が **0 以上** であること（負の重みがある場合はベルマンフォード法等が必要）。
-- **特徴**:
-  - `priority_queue`（最小ヒープ）を用いて、未確定頂点のうち距離が最小のものを順次確定させていきます。
-  - 経路復元用配列 `prev` を保持することで、最短経路上の頂点列を復元できます。
+- **変数名ルール**（`1.cpp` スタイル）:
+  - `todo`: 優先度付きキュー (`priority_queue`)
+  - `dist`: 距離配列（未到達は `-1`、確定時に代入）
+  - `auto [c, t] = todo.top();`: `c` は現在の最短コスト、`t` は対象頂点
+  - `g[t]` の各要素 `[w, i]`: `w` は移動重み、`i` は遷移先頂点
 
 ---
 
-## 2. コピペ用コード (C++)
+## 2. コピペ用コード (直書き)
 
-### グラフ版ダイクストラ (経路復元対応)
+### 通常のグラフ
 ```cpp
-using ll = long long;
-const ll INF = 4e18; // オーバーフロー防止のため 4e18 を推奨
+// グラフの用意 (重み w, 行き先 i)
+vector<vector<pair<ll, ll>>> g(n);
+// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({w, v}); g[v].pb({w, u}); }
 
-struct Edge {
-    int to;
-    ll cost;
-};
+// ダイクストラ法 (始点 s)
+priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>> todo;
+todo.push({0, s});
+vector<ll> dist(n, -1);
 
-struct Dijkstra {
-    int n;
-    vector<vector<Edge>> g;
-    vector<ll> dist;
-    vector<int> prev;
-
-    Dijkstra(int n) : n(n), g(n), dist(n, INF), prev(n, -1) {}
-
-    // 有向辺の追加 (無向辺は双方向に追加)
-    void add_edge(int from, int to, ll cost) {
-        g[from].push_back({to, cost});
+while (!todo.empty()) {
+  auto [c, t] = todo.top();
+  todo.pop();
+  if (dist[t] != -1) {
+    continue;
+  }
+  dist[t] = c;
+  for (auto [w, i] : g[t]) {
+    if (dist[i] == -1) {
+      todo.push({c + w, i});
     }
-
-    void build(int start) {
-        dist.assign(n, INF);
-        prev.assign(n, -1);
-        
-        priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>> pq;
-        dist[start] = 0;
-        pq.push({0, start});
-
-        while (!pq.empty()) {
-            auto [d, u] = pq.top();
-            pq.pop();
-
-            if (d > dist[u]) continue;
-
-            for (const auto& e : g[u]) {
-                if (dist[e.to] > dist[u] + e.cost) {
-                    dist[e.to] = dist[u] + e.cost;
-                    prev[e.to] = u;
-                    pq.push({dist[e.to], e.to});
-                }
-            }
-        }
-    }
-
-    // start から goal への経路を復元 (到達不可なら空配列)
-    vector<int> get_path(int goal) {
-        if (dist[goal] == INF) return {};
-        vector<int> path;
-        for (int cur = goal; cur != -1; cur = prev[cur]) path.push_back(cur);
-        reverse(path.begin(), path.end());
-        return path;
-    }
-};
+  }
+}
 ```
 
-### グリッド版ダイクストラ (マス目の移動コスト)
+### 経路復元付き
 ```cpp
-using ll = long long;
-const ll INF = 4e18;
+vector<int> prev_node(n, -1);
+priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>> todo;
+todo.push({0, s});
+vector<ll> dist(n, -1);
 
-// H x W グリッドの最短経路
-vector<vector<ll>> grid_dijkstra(int h, int w, int start_r, int start_c,
-                                 const vector<vector<ll>>& grid_cost) {
-    const vector<int> dr = {0, 0, 1, -1};
-    const vector<int> dc = {1, -1, 0, 0};
-    vector<vector<ll>> dist(h, vector<ll>(w, INF));
-    
-    using State = pair<ll, pair<int, int>>;
-    priority_queue<State, vector<State>, greater<State>> pq;
-
-    dist[start_r][start_c] = 0;
-    pq.push({0, {start_r, start_c}});
-
-    while (!pq.empty()) {
-        auto [d, pos] = pq.top();
-        auto [r, c] = pos;
-        pq.pop();
-
-        if (d > dist[r][c]) continue;
-
-        for (int k = 0; k < 4; k++) {
-            int nr = r + dr[k], nc = c + dc[k];
-            if (nr < 0 || nr >= h || nc < 0 || nc >= w) continue;
-            
-            ll next_cost = grid_cost[nr][nc];
-            if (dist[nr][nc] > dist[r][c] + next_cost) {
-                dist[nr][nc] = dist[r][c] + next_cost;
-                pq.push({dist[nr][nc], {nr, nc}});
-            }
-        }
+while (!todo.empty()) {
+  auto [c, t] = todo.top();
+  todo.pop();
+  if (dist[t] != -1) {
+    continue;
+  }
+  dist[t] = c;
+  for (auto [w, i] : g[t]) {
+    if (dist[i] == -1) {
+      prev_node[i] = t;
+      todo.push({c + w, i});
     }
-    return dist;
+  }
+}
+
+// goal への経路復元 (s -> ... -> goal)
+vector<int> path;
+for (int cur = goal; cur != -1; cur = prev_node[cur]) path.pb(cur);
+reverse(path.begin(), path.end());
+```
+
+### グリッド版
+```cpp
+const vector<int> dx = {1, 0, -1, 0};
+const vector<int> dy = {0, 1, 0, -1};
+
+// {コスト, {x, y}}
+priority_queue<pair<ll, pair<int, int>>, vector<pair<ll, pair<int, int>>>, greater<pair<ll, pair<int, int>>>> todo;
+todo.push({0, {sx, sy}});
+vector<vector<ll>> dist(h, vector<ll>(w, -1));
+
+while (!todo.empty()) {
+  auto [c, pos] = todo.top();
+  auto [x, y] = pos;
+  todo.pop();
+  if (dist[x][y] != -1) {
+    continue;
+  }
+  dist[x][y] = c;
+
+  rep(k, 4) {
+    int nx = x + dx[k], ny = y + dy[k];
+    if (nx < 0 || nx >= h || ny < 0 || ny >= w) continue;
+    // if (grid[nx][ny] == '#') continue; // 壁判定
+    if (dist[nx][ny] == -1) {
+      ll cost = 1; // マスへの進入コスト
+      todo.push({c + cost, {nx, ny}});
+    }
+  }
 }
 ```
 
 ---
 
 ## 3. 注意点
-1. **INF の値とオーバーフロー**:
-   - `INT_MAX` だと `dist[u] + cost` でオーバーフローします。`long long` を使い、`4e18` など十分大きい値を設定してください。
-2. **`if (d > dist[u]) continue;` を忘れない**:
-   - これがないと、同じ頂点がヒープから何度も無駄に取り出され、最悪 $O(E \log V)$ ではなく $O(E^2)$ や TLE の原因になります。
-3. **コストが 0 または 1 だけの場合**:
-   - ダイクストラ法よりも **01-BFS**（`std::deque`）を使うほうが $O(V + E)$ で圧倒的に高速です。
+- **`dist[t] != -1` による重複スキップ**:
+  - キューから取り出した時点で `dist[t] != -1` であれば、すでに最短距離が確定済みのため `continue` します。
+- **重みの型**:
+  - コストの加算でオーバーフローを防ぐため、`c` や `dist` は `ll` (`long long`) を推奨します。

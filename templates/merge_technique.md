@@ -1,166 +1,85 @@
-# マージテク (Small to Large / DSU on Tree)
+# マージテク (Small to Large)
 
-2つのデータ構造をマージする際、「小さい方を大きい方にマージする（`swap` してから要素を移す）」ことで、全体の計算量を大幅に削減する定石テクニックです。
-
----
-
-## 1. 概要・いつ使うか
-- **使える場面**:
-  1. **集合（`set`, `map`, `vector`）のマージ**:
-     - 木の葉から根に向かって情報を統合するとき、ナイーブにマージすると最悪 $O(N^2)$ になりますが、`if (a.size() < b.size()) swap(a, b);` とすることで各要素の移動回数が高々 $O(\log N)$ 回に抑えられ、全体で $O(N \log^2 N)$（またはハッシュで $O(N \log N)$）になります。
-  2. **木上のマージテク (DSU on Tree / Sack)**:
-     - 根付き木の全頂点 $u$ について、「$u$ の部分木内に条件を満たす頂点が何個あるか？」に答えるアルゴリズムです。
-     - セグメント木や Heavy-Light Decomposition (HLD) を使わずに、グローバルな集計配列 1 つと再帰だけで $O(N \log N)$ で解くことができます。
+2つのデータ構造をマージする際、「小さい方を大きい方にマージする（`swap` してから要素を移す）」ことで、全体の計算量を大幅に削減する定石テクニックです。  
+構造体を作らず、`solve()` / `main()` 内に直書きできるスタイル（`3.cpp` 準拠）です。
 
 ---
 
-## 2. コピペ用コード (C++)
+## 1. 概要・特徴
+- **計算量**: 全体で $O(N \log N)$（要素の移動回数が高々 $\log N$ 回に収まるため）
+- **変数名ルール**（`3.cpp` スタイル）:
+  - `g`: 各集合に属する要素リスト (`vector<vector<int>> g(n);`)
+  - `par`: 各要素の代表元 (`vector<int> par(n);`)
+  - 代表元に揃える: `u = par[u]; v = par[v];`
+  - サイズ比較とマージ:
+    - `if (g[u].size() < g[v].size()) swap(u, v);`
+    - 小さい方 (`g[v]`) から大きい方 (`g[u]`) へ `pb` し、`par[i] = u` を更新
+    - `g[v].clear();`
 
-### パターン 1: 単純な set / map のマージ
+---
+
+## 2. コピペ用コード (直書き)
+
+### パターン 1: クエリによる集合マージ (3.cpp スタイル)
 ```cpp
-// 小さい set を大きい set へマージ (全体で O(N log^2 N))
-template <typename T>
-void merge_set(set<T>& big, set<T>& small) {
-    if (big.size() < small.size()) swap(big, small);
-    for (const auto& elem : small) {
-        big.insert(elem);
-    }
-    small.clear();
+// 初期化: 各頂点を独立した集合とし、代表元を自分自身に設定
+vector<vector<int>> g(n);
+vector<int> par(n);
+rep(i, n) {
+  g[i].pb(i);
+  par[i] = i;
 }
 
-// 小さい map を大きい map へマージ (頻度集計など)
-template <typename Key, typename Val>
-void merge_map(map<Key, Val>& big, map<Key, Val>& small) {
-    if (big.size() < small.size()) swap(big, small);
-    for (const auto& p : small) {
-        big[p.first] += p.second;
-    }
-    small.clear();
+// 頂点 u と 頂点 v の属する集合をマージする処理 (Union-Find 的な操作)
+u = par[u];
+v = par[v];
+if (u != v) {
+  // サイズが小さい方 (v) を大きい方 (u) へマージ
+  if (g[u].size() < g[v].size()) {
+    swap(u, v);
+  }
+  for (auto &i : g[v]) {
+    g[u].pb(i);
+    par[i] = u;
+  }
+  g[v].clear();
 }
 ```
 
-### パターン 2: 木上のマージテク (DSU on Tree / Sack)
+### パターン 2: 木上の部分木マージ (DFS 直書き)
 ```cpp
-struct DsuOnTree {
-    int n;
-    vector<vector<int>> g;
-    vector<int> sz, heavy, in, out, node_by_in;
-    int timer;
-
-    DsuOnTree(int n) : n(n), g(n), sz(n), heavy(n, -1), in(n), out(n), node_by_in(n), timer(0) {}
-
-    void add_edge(int u, int v) {
-        g[u].push_back(v);
-        g[v].push_back(u);
-    }
-
-    void build_tree(int root = 0) {
-        auto dfs_size = [&](auto self, int u, int p) -> void {
-            sz[u] = 1;
-            in[u] = timer;
-            node_by_in[timer] = u;
-            timer++;
-            int max_sub = -1;
-            for (int v : g[u]) {
-                if (v == p) continue;
-                self(self, v, u);
-                sz[u] += sz[v];
-                if (sz[v] > max_sub) {
-                    max_sub = sz[v];
-                    heavy[u] = v; // 最もサイズが大きい子
-                }
-            }
-            out[u] = timer;
-        };
-        timer = 0;
-        dfs_size(dfs_size, root, -1);
-    }
-
-    // add(u): 頂点 u を集計配列に追加
-    // del(u): 頂点 u を集計配列から削除
-    // query(u): 部分木 u の答えを記録
-    template <typename Add, typename Del, typename Query>
-    void run(const Add& add, const Del& del, const Query& query, int root = 0) {
-        auto dfs = [&](auto self, int u, int p, bool keep) -> void {
-            // 1. 軽い子を探索 (計算後に状態をクリア keep = false)
-            for (int v : g[u]) {
-                if (v != p && v != heavy[u]) self(self, v, u, false);
-            }
-            // 2. 最も重い子を探索 (計算結果を維持 keep = true)
-            if (heavy[u] != -1) self(self, heavy[u], u, true);
-            
-            // 3. 自分と軽い子の部分木を追加
-            add(u);
-            for (int v : g[u]) {
-                if (v != p && v != heavy[u]) {
-                    for (int t = in[v]; t < out[v]; t++) add(node_by_in[t]);
-                }
-            }
-            // 4. 部分木 u に対する集計・クエリ処理
-            query(u);
-
-            // 5. 軽い子だった場合は状態を元に戻す
-            if (!keep) {
-                for (int t = in[u]; t < out[u]; t++) del(node_by_in[t]);
-            }
-        };
-
-        dfs(dfs, root, -1, false);
-    }
-};
-```
-
----
-
-## 3. DSU on Tree の使い方 (部分木の色種類数カウント例)
-
-```cpp
-int n;
-cin >> n;
-vector<int> color(n);
-for (int i = 0; i < n; i++) cin >> color[i];
-
-DsuOnTree dot(n);
-for (int i = 0; i < n - 1; i++) {
-    int u, v;
-    cin >> u >> v;
-    u--; v--; // 0-indexed
-    dot.add_edge(u, v);
-}
-dot.build_tree(0);
-
+// 各頂点 u の部分木の要素 (色や値など) を葉から親へマージする
+vector<vector<int>> tree(n);
+vector<set<int>> st(n); // または vector<vector<int>> st(n);
 vector<int> ans(n);
-vector<int> cnt(1000005, 0);
-int distinct_colors = 0;
 
-auto add = [&](int u) {
-    int c = color[u];
-    if (cnt[c] == 0) distinct_colors++;
-    cnt[c]++;
+auto dfs = [&](auto self, int u, int p) -> void {
+  st[u].insert(color[u]);
+
+  for (int v : tree[u]) {
+    if (v == p) continue;
+    self(self, v, u);
+
+    // 小さい方 (v) を大きい方 (u) へマージ
+    if (st[u].size() < st[v].size()) {
+      swap(st[u], st[v]);
+    }
+    for (auto &x : st[v]) {
+      st[u].insert(x);
+    }
+    st[v].clear();
+  }
+
+  // 部分木 u に対する答えを記録 (例: 部分木内の色の種類数)
+  ans[u] = st[u].size();
 };
-
-auto del = [&](int u) {
-    int c = color[u];
-    cnt[c]--;
-    if (cnt[c] == 0) distinct_colors--;
-};
-
-auto query = [&](int u) {
-    ans[u] = distinct_colors;
-};
-
-dot.run(add, del, query, 0);
-
-for (int i = 0; i < n; i++) {
-    cout << ans[i] << "\n";
-}
+dfs(dfs, 0, -1);
 ```
 
 ---
 
-## 4. 注意点・Tips
-- **C++ の `std::swap`**:
-  - `std::vector`, `std::set`, `std::map` の `swap(a, b)` はポインタの付け替えのみを行うため $O(1)$ です。
-- **DSU on Tree の強み**:
-  - 重い子（Heavy Child）の計算結果をそのまま残すため、不要な削除・再追加が発生せず、各頂点は高々 $O(\log N)$ 回しか追加されません。
-  - セグ木が乗らない複雑な集計（最頻値の個数、MEX、特定深さの要素数など）も配列や変数を直接更新できるため非常に書きやすいです。
+## 3. 注意点
+- **`std::swap` は $O(1)$**:
+  - `vector` や `set` の `swap(a, b)` は内部ポインタの付け替えのみを行うため $O(1)$ で完了します。
+- **代表元の更新**:
+  - `par[i] = u` を忘れると、移動後の要素が古い代表元を参照してバグになります。

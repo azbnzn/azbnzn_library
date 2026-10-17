@@ -1,168 +1,115 @@
 #include <bits/stdc++.h>
 using namespace std;
 using ll = long long;
+#define rep(i, n) for (ll i = 0; i < (ll)(n); i++)
+#define pb push_back
 
 /* =========================================================================
-   [マージテク (Small to Large)]
-   1. 基本テク: 集合 (set, map) をマージする際、小さい方を大きい方にマージする。
-      swap(a, b) は O(1) なので、全体で O(N log^2 N) に抑えられる。
-   2. DSU on Tree (Sack): 木の部分木クエリをグローバル配列1つで O(N log N)
-      で処理する超強力な木上マージテクニック。
+   [マージテク (Small to Large) - 直書き用テンプレート]
+   ・変数名: g, par, u, v, i (3.cpp と完全一致)
+   ・小さい集合を大きい集合へ swap してマージすることで全体 O(N log N) に収める。
    ========================================================================= */
 
-// ==================== [コピペここから 1: 基本集合マージ] ====================
-// 小さい set を大きい set へマージ (O(min(A, B) * log(max(A, B))))
-template <typename T>
-void merge_set(set<T>& big, set<T>& small) {
-    if (big.size() < small.size()) swap(big, small);
-    for (const auto& elem : small) {
-        big.insert(elem);
-    }
-    small.clear();
+// ==================== [コピペここから 1: クエリによる集合マージ (3.cppスタイル)] ====================
+/*
+// 初期化: 各頂点を独立した集合とし、代表元を自分自身に設定
+vector<vector<int>> g(n);
+vector<int> par(n);
+rep(i, n) {
+  g[i].pb(i);
+  par[i] = i;
 }
 
-// 小さい map を大きい map へマージ (頻度集計など)
-template <typename Key, typename Val>
-void merge_map(map<Key, Val>& big, map<Key, Val>& small) {
-    if (big.size() < small.size()) swap(big, small);
-    for (const auto& p : small) {
-        big[p.first] += p.second;
-    }
-    small.clear();
+// 頂点 u と 頂点 v の属する集合をマージする処理 (Union-Find 的な操作)
+u = par[u];
+v = par[v];
+if (u != v) {
+  // サイズが小さい方 (v) を大きい方 (u) へマージ
+  if (g[u].size() < g[v].size()) {
+    swap(u, v);
+  }
+  for (auto &i : g[v]) {
+    g[u].pb(i);
+    par[i] = u;
+  }
+  g[v].clear();
 }
-// ==================== [コピペここまで 1] ====================
+*/
+// ==================== [コピペここまで 1: 集合マージ] ====================
 
 
-// ==================== [コピペここから 2: 木上のマージテク (DSU on Tree / Sack)] ====================
-// 木の全部分木に対するクエリ (色の種類数、特定値の個数など) を O(N log N) で解く
-struct DsuOnTree {
-    int n;
-    vector<vector<int>> g;
-    vector<int> sz, heavy, in, out, node_by_in;
-    int timer;
+// ==================== [コピペここから 2: 木上の部分木マージ (DFS直書き)] ====================
+/*
+// 各頂点 u の部分木の要素 (色や値など) を葉から親へマージする
+vector<vector<int>> tree(n);
+vector<set<int>> st(n); // または vector<vector<int>> st(n);
+vector<int> ans(n);
 
-    DsuOnTree(int n) : n(n), g(n), sz(n), heavy(n, -1), in(n), out(n), node_by_in(n), timer(0) {}
+auto dfs = [&](auto self, int u, int p) -> void {
+  st[u].insert(color[u]);
 
-    void add_edge(int u, int v) {
-        g[u].push_back(v);
-        g[v].push_back(u);
+  for (int v : tree[u]) {
+    if (v == p) continue;
+    self(self, v, u);
+
+    // 小さい方 (v) を大きい方 (u) へマージ
+    if (st[u].size() < st[v].size()) {
+      swap(st[u], st[v]);
     }
-
-    void build_tree(int root = 0) {
-        auto dfs_size = [&](auto self, int u, int p) -> void {
-            sz[u] = 1;
-            in[u] = timer;
-            node_by_in[timer] = u;
-            timer++;
-            int max_sub = -1;
-            for (int v : g[u]) {
-                if (v == p) continue;
-                self(self, v, u);
-                sz[u] += sz[v];
-                if (sz[v] > max_sub) {
-                    max_sub = sz[v];
-                    heavy[u] = v; // 最もサイズの大きい子
-                }
-            }
-            out[u] = timer;
-        };
-        timer = 0;
-        dfs_size(dfs_size, root, -1);
+    for (auto &x : st[v]) {
+      st[u].insert(x);
     }
+    st[v].clear();
+  }
 
-    // add(u): 頂点 u の情報を集計配列に追加
-    // del(u): 頂点 u の情報を集計配列から削除
-    // query(u): 部分木 u の答えを記録
-    template <typename Add, typename Del, typename Query>
-    void run(const Add& add, const Del& del, const Query& query, int root = 0) {
-        auto dfs = [&](auto self, int u, int p, bool keep) -> void {
-            // 1. 軽い子を探索 (計算後は状態を消去 keep = false)
-            for (int v : g[u]) {
-                if (v != p && v != heavy[u]) {
-                    self(self, v, u, false);
-                }
-            }
-            // 2. 最も重い子を探索 (計算結果を維持 keep = true)
-            if (heavy[u] != -1) {
-                self(self, heavy[u], u, true);
-            }
-            // 3. 自分自身と軽い子たちの部分木要素を追加
-            add(u);
-            for (int v : g[u]) {
-                if (v != p && v != heavy[u]) {
-                    for (int t = in[v]; t < out[v]; t++) {
-                        add(node_by_in[t]);
-                    }
-                }
-            }
-            // 4. 部分木 u に対するクエリを処理
-            query(u);
-
-            // 5. 軽い子だった場合は状態を元に戻す (del)
-            if (!keep) {
-                for (int t = in[u]; t < out[u]; t++) {
-                    del(node_by_in[t]);
-                }
-            }
-        };
-
-        dfs(dfs, root, -1, false);
-    }
+  // 部分木 u に対する答えを記録 (例: 部分木内の色の種類数)
+  ans[u] = st[u].size();
 };
-// ==================== [コピペここまで 2] ====================
+dfs(dfs, 0, -1);
+*/
+// ==================== [コピペここまで 2: 木上マージ] ====================
 
 
-// --- 使用例: 各頂点 u の部分木内に存在する「色の種類数」を求める ---
+// --- 動作確認テスト (3.cpp と同等の動作) ---
 int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
+  ios::sync_with_stdio(false);
+  cin.tie(nullptr);
 
-    // 頂点数 7 の木
-    //       0(c=1)
-    //      /      \
-    //    1(c=2)   2(c=1)
-    //    /    \     \
-    //  3(c=2) 4(c=3) 5(c=4)
-    //                 \
-    //                 6(c=4)
-    int n = 7;
-    vector<int> color = {1, 2, 1, 2, 3, 4, 4};
+  int n = 5;
+  vector<vector<int>> g(n);
+  vector<int> par(n);
+  rep(i, n) {
+    g[i].pb(i);
+    par[i] = i;
+  }
 
-    DsuOnTree dot(n);
-    vector<pair<int, int>> edges = {{0, 1}, {0, 2}, {1, 3}, {1, 4}, {2, 5}, {5, 6}};
-    for (auto& e : edges) dot.add_edge(e.first, e.second);
+  // クエリ操作の例
+  auto unite = [&](int u, int v) {
+    u = par[u];
+    v = par[v];
+    if (u == v) return;
 
-    dot.build_tree(0);
-
-    vector<int> ans(n, 0);
-    vector<int> cnt(10, 0);
-    int distinct_colors = 0;
-
-    auto add = [&](int u) {
-        int c = color[u];
-        if (cnt[c] == 0) distinct_colors++;
-        cnt[c]++;
-    };
-
-    auto del = [&](int u) {
-        int c = color[u];
-        cnt[c]--;
-        if (cnt[c] == 0) distinct_colors--;
-    };
-
-    auto query = [&](int u) {
-        ans[u] = distinct_colors;
-    };
-
-    dot.run(add, del, query, 0);
-
-    cout << "=== DSU on Tree (マージテク) Test Output ===" << "\n";
-    for (int i = 0; i < n; i++) {
-        cout << "Subtree " << i << " distinct colors: " << ans[i] << "\n";
+    if (g[u].size() < g[v].size()) {
+      swap(u, v);
     }
-    // Subtree 0: {1,2,3,4} -> 4種
-    // Subtree 1: {2,3} -> 2種
-    // Subtree 2: {1,4} -> 2種
-    // Subtree 5: {4} -> 1種
-    return 0;
+    for (auto &i : g[v]) {
+      g[u].pb(i);
+      par[i] = u;
+    }
+    g[v].clear();
+  };
+
+  unite(0, 1);
+  unite(2, 3);
+  unite(1, 3);
+
+  cout << "=== Merge Technique Test Output ===" << "\n";
+  rep(i, n) {
+    cout << "Node " << i << " leader = " << par[i] << "\n";
+  }
+  cout << "Group of 0 contains: ";
+  for (int x : g[par[0]]) cout << x << " ";
+  cout << "\n";
+
+  return 0;
 }
