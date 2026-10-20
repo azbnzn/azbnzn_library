@@ -6,16 +6,17 @@ using ll = long long;
 
 /* =========================================================================
    [01-BFS - 直書き用テンプレート]
-   ・ダイクストラ (1.cpp) と同じ変数名・雰囲気 (todo, dist, c, t, w, i)
+   ・ダイクストラと同じ変数名・雰囲気 (todo, dist, c, t, to, w)
+   ・グラフ表現: g[t] は <次の行き先 to, 重み w (0 or 1)>
    ・重みが 0 と 1 のみの場合、deque を使って O(V + E) で高速に解く。
    ・コスト 0 は push_front、コスト 1 は push_back。
    ========================================================================= */
 
 // ==================== [コピペここから: 通常のグラフ] ====================
 /*
-// グラフの用意 (重み w: 0 or 1, 行き先 i)
-vector<vector<pair<ll, ll>>> g(n);
-// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({w, v}); g[v].pb({w, u}); }
+// グラフの用意 (次の行き先 to, 重み w: 0 or 1)
+vector<vector<pair<int, ll>>> g(n);
+// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({v, w}); g[v].pb({u, w}); }
 
 // 01-BFS (始点 s)
 deque<pair<ll, int>> todo;
@@ -29,12 +30,12 @@ while (!todo.empty()) {
     continue;
   }
   dist[t] = c;
-  for (auto [w, i] : g[t]) {
-    if (dist[i] == -1) {
+  for (auto [to, w] : g[t]) {
+    if (dist[to] == -1) {
       if (w == 0) {
-        todo.push_front({c, i});
+        todo.push_front({c, to});
       } else {
-        todo.push_back({c + 1, i});
+        todo.push_back({c + 1, to});
       }
     }
   }
@@ -57,13 +58,13 @@ while (!todo.empty()) {
     continue;
   }
   dist[t] = c;
-  for (auto [w, i] : g[t]) {
-    if (dist[i] == -1) {
-      prev_node[i] = t;
+  for (auto [to, w] : g[t]) {
+    if (dist[to] == -1) {
+      prev_node[to] = t;
       if (w == 0) {
-        todo.push_front({c, i});
+        todo.push_front({c, to});
       } else {
-        todo.push_back({c + 1, i});
+        todo.push_back({c + 1, to});
       }
     }
   }
@@ -119,12 +120,12 @@ int main() {
   cin.tie(nullptr);
 
   int n = 4;
-  vector<vector<pair<ll, ll>>> g(n);
+  vector<vector<pair<int, ll>>> g(n);
   // 0 -> 1 (w=1), 0 -> 2 (w=0), 2 -> 3 (w=0), 1 -> 3 (w=0)
   g[0].pb({1, 1});
-  g[0].pb({0, 2});
-  g[2].pb({0, 3});
-  g[1].pb({0, 3});
+  g[0].pb({2, 0});
+  g[2].pb({3, 0});
+  g[1].pb({3, 0});
 
   int s = 0;
   deque<pair<ll, int>> todo;
@@ -138,12 +139,12 @@ int main() {
       continue;
     }
     dist[t] = c;
-    for (auto [w, i] : g[t]) {
-      if (dist[i] == -1) {
+    for (auto [to, w] : g[t]) {
+      if (dist[to] == -1) {
         if (w == 0) {
-          todo.push_front({c, i});
+          todo.push_front({c, to});
         } else {
-          todo.push_back({c + 1, i});
+          todo.push_back({c + 1, to});
         }
       }
     }

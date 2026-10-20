@@ -6,21 +6,22 @@ using ll = long long;
 
 /* =========================================================================
    [ダイクストラ法 (Dijkstra) - 直書き用テンプレート]
-   ・変数名: todo, dist, c, t, w, i (1.cpp と完全一致)
+   ・変数名: todo, dist, c, t, to, cost (または w)
+   ・グラフ表現: g[t] は <次の行き先 to, 重み cost>
    ・未訪問判定: dist[t] == -1
    ・計算量: O((V + E) log V)
    ========================================================================= */
 
 // ==================== [コピペここから: 通常のグラフ] ====================
 /*
-// グラフの用意 (重み w, 行き先 i)
-vector<vector<pair<ll, int>>> g(n);
-// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({w, v}); g[v].pb({w, u});
-}
+// グラフの用意 (次の行き先 to, 重み cost)
+vector<vector<pair<int, ll>>> g(n);
+// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({v, w}); g[v].pb({u, w}); }
 
 // ダイクストラ法 (始点 s)
-priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>>
-todo; todo.push({0, s}); vector<ll> dist(n, -1);
+priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>> todo;
+todo.push({0, s});
+vector<ll> dist(n, -1);
 
 while (!todo.empty()) {
   auto [c, t] = todo.top();
@@ -29,9 +30,9 @@ while (!todo.empty()) {
     continue;
   }
   dist[t] = c;
-  for (auto [w, i] : g[t]) {
-    if (dist[i] == -1) {
-      todo.push({c + w, i});
+  for (auto [to, cost] : g[t]) {
+    if (dist[to] == -1) {
+      todo.push({c + cost, to});
     }
   }
 }
@@ -41,8 +42,9 @@ while (!todo.empty()) {
 // ==================== [コピペここから: 経路復元付き] ====================
 /*
 vector<int> prev_node(n, -1);
-priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>>
-todo; todo.push({0, s}); vector<ll> dist(n, -1);
+priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>> todo;
+todo.push({0, s});
+vector<ll> dist(n, -1);
 
 while (!todo.empty()) {
   auto [c, t] = todo.top();
@@ -51,10 +53,10 @@ while (!todo.empty()) {
     continue;
   }
   dist[t] = c;
-  for (auto [w, i] : g[t]) {
-    if (dist[i] == -1) {
-      prev_node[i] = t;
-      todo.push({c + w, i});
+  for (auto [to, cost] : g[t]) {
+    if (dist[to] == -1) {
+      prev_node[to] = t;
+      todo.push({c + cost, to});
     }
   }
 }
@@ -104,14 +106,13 @@ int main() {
   cin.tie(nullptr);
 
   int n = 5;
-  vector<vector<pair<ll, int>>> g(n);
-  // 0 -> 1 (cost 10), 0 -> 2 (cost 3), 2 -> 1 (cost 2), 1 -> 3 (cost 1), 3 -> 4
-  // (cost 7)
-  g[0].pb({10, 1});
-  g[0].pb({3, 2});
-  g[2].pb({2, 1});
-  g[1].pb({1, 3});
-  g[3].pb({7, 4});
+  vector<vector<pair<int, ll>>> g(n);
+  // 0 -> 1 (cost 10), 0 -> 2 (cost 3), 2 -> 1 (cost 2), 1 -> 3 (cost 1), 3 -> 4 (cost 7)
+  g[0].pb({1, 10});
+  g[0].pb({2, 3});
+  g[2].pb({1, 2});
+  g[1].pb({3, 1});
+  g[3].pb({4, 7});
 
   int s = 0;
   priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>>
@@ -126,9 +127,9 @@ int main() {
       continue;
     }
     dist[t] = c;
-    for (auto [w, i] : g[t]) {
-      if (dist[i] == -1) {
-        todo.push({c + w, i});
+    for (auto [to, cost] : g[t]) {
+      if (dist[to] == -1) {
+        todo.push({c + cost, to});
       }
     }
   }

@@ -7,11 +7,11 @@
 
 ## 1. 概要・特徴
 - **計算量**: $O((V + E) \log V)$
-- **変数名ルール**（`1.cpp` スタイル）:
+- **変数名ルール**:
   - `todo`: 優先度付きキュー (`priority_queue`)
   - `dist`: 距離配列（未到達は `-1`、確定時に代入）
   - `auto [c, t] = todo.top();`: `c` は現在の最短コスト、`t` は対象頂点
-  - `g[t]` の各要素 `[w, i]`: `w` は移動重み、`i` は遷移先頂点
+  - `g[t]` の各要素 `[to, cost]`: `to` は次の行き先、`cost` は移動重み
 
 ---
 
@@ -19,9 +19,9 @@
 
 ### 通常のグラフ
 ```cpp
-// グラフの用意 (重み w, 行き先 i)
-vector<vector<pair<ll, ll>>> g(n);
-// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({w, v}); g[v].pb({w, u}); }
+// グラフの用意 (次の行き先 to, 重み cost)
+vector<vector<pair<int, ll>>> g(n);
+// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({v, w}); g[v].pb({u, w}); }
 
 // ダイクストラ法 (始点 s)
 priority_queue<pair<ll, int>, vector<pair<ll, int>>, greater<pair<ll, int>>> todo;
@@ -35,9 +35,9 @@ while (!todo.empty()) {
     continue;
   }
   dist[t] = c;
-  for (auto [w, i] : g[t]) {
-    if (dist[i] == -1) {
-      todo.push({c + w, i});
+  for (auto [to, cost] : g[t]) {
+    if (dist[to] == -1) {
+      todo.push({c + cost, to});
     }
   }
 }
@@ -57,10 +57,10 @@ while (!todo.empty()) {
     continue;
   }
   dist[t] = c;
-  for (auto [w, i] : g[t]) {
-    if (dist[i] == -1) {
-      prev_node[i] = t;
-      todo.push({c + w, i});
+  for (auto [to, cost] : g[t]) {
+    if (dist[to] == -1) {
+      prev_node[to] = t;
+      todo.push({c + cost, to});
     }
   }
 }

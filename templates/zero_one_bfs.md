@@ -7,11 +7,11 @@
 
 ## 1. 概要・特徴
 - **計算量**: $O(V + E)$ （ダイクストラの $\log$ が消えて超高速）
-- **変数名ルール**（ダイクストラ `1.cpp` と統一）:
+- **変数名ルール**（ダイクストラと統一）:
   - `todo`: 両端キュー (`std::deque`)
   - `dist`: 距離配列（未到達は `-1`、確定時に代入）
   - `auto [c, t] = todo.front();`: `c` はコスト、`t` は対象頂点
-  - `g[t]` の各要素 `[w, i]`: `w` は重み (0 or 1)、`i` は遷移先頂点
+  - `g[t]` の各要素 `[to, w]`: `to` は次の行き先、`w` は重み (0 or 1)
   - 遷移時: **`w == 0` なら `push_front`、`w == 1` なら `push_back`**
 
 ---
@@ -20,9 +20,9 @@
 
 ### 通常のグラフ
 ```cpp
-// グラフの用意 (重み w: 0 or 1, 行き先 i)
-vector<vector<pair<ll, ll>>> g(n);
-// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({w, v}); g[v].pb({w, u}); }
+// グラフの用意 (次の行き先 to, 重み w: 0 or 1)
+vector<vector<pair<int, ll>>> g(n);
+// rep(i, m) { ll u, v, w; cin >> u >> v >> w; g[u].pb({v, w}); g[v].pb({u, w}); }
 
 // 01-BFS (始点 s)
 deque<pair<ll, int>> todo;
@@ -36,12 +36,12 @@ while (!todo.empty()) {
     continue;
   }
   dist[t] = c;
-  for (auto [w, i] : g[t]) {
-    if (dist[i] == -1) {
+  for (auto [to, w] : g[t]) {
+    if (dist[to] == -1) {
       if (w == 0) {
-        todo.push_front({c, i});
+        todo.push_front({c, to});
       } else {
-        todo.push_back({c + 1, i});
+        todo.push_back({c + 1, to});
       }
     }
   }
@@ -62,13 +62,13 @@ while (!todo.empty()) {
     continue;
   }
   dist[t] = c;
-  for (auto [w, i] : g[t]) {
-    if (dist[i] == -1) {
-      prev_node[i] = t;
+  for (auto [to, w] : g[t]) {
+    if (dist[to] == -1) {
+      prev_node[to] = t;
       if (w == 0) {
-        todo.push_front({c, i});
+        todo.push_front({c, to});
       } else {
-        todo.push_back({c + 1, i});
+        todo.push_back({c + 1, to});
       }
     }
   }
