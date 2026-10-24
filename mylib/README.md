@@ -24,14 +24,17 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
     - [LazySqrtDecomposition (遅延平方分割)](#lazysqrtdecomposition-遅延平方分割)
     - [OrderStatisticSet (順序付き集合)](#orderstatisticset-順序付き集合)
     - [CoordinateCompression (座標圧縮)](#coordinatecompression-座標圧縮)
+    - [MosAlgorithm (Mo's algorithm)](#mosalgorithm)
+    - [TwoPointers (尺取り法)](#twopointers-尺取り法)
   - [2. 文字列 (Strings)](#2-文字列-strings)
-    - [RollingHash (安全なダブルローリングハッシュ)](#rollinghash-安全なダブルローリングハッシュ)
+    - [DoubleRollingHash (安全なダブルローリングハッシュ・点更新対応)](#doublerollinghash-安全なダブルローリングハッシュ点更新対応)
     - [DynamicStringTreap (動的文字列平衡二分木)](#dynamicstringtreap-動的文字列平衡二分木)
     - [Trie / MapTrie](#trie--maptrie)
   - [3. グラフ・木 (Graphs & Trees)](#3-グラフ木-graphs--trees)
     - [Dijkstra (単一始点最短経路)](#dijkstra-単一始点最短経路)
     - [TopologicalSort (トポロジカルソート)](#topologicalsort-トポロジカルソート)
     - [Rerooting (全方位木DP)](#rerooting-全方位木dp)
+    - [EulerTour (オイラーツアー・LCA)](#eulertour)
   - [4. 数学・数論 (Math & Number Theory)](#4-数学数論-math--number-theory)
     - [NumberTheory (高速数論・素因数分解・CRT)](#numbertheory-高速数論素因数分解crt)
     - [BiCoef (二項係数・順列・重複組合せ)](#bicoef-二項係数順列重複組合せ)
@@ -73,12 +76,15 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
 | 区間加算・区間変更・区間クエリ（遅延評価） | `LazySqrtDecomposition<...>` | クエリ $O(\sqrt{N})$ | `LazySqrtDecomposition.hpp` |
 | $k$ 番目に小さい値 / 値 $x$ 未満の要素数 | `OrderStatisticSet<T>` (`OSS`) | $O(\log N)$ | `OrderStatisticSet.hpp` |
 | 座標圧縮・添字変換・復元 | `CoordinateCompression<T>` | 構築 $O(N \log N)$<br>取得 $O(\log N)$ / $O(1)$ | `CoordinateCompression.hpp` |
-| 文字列一致判定・LCP（最長共通接頭辞） | `DoubleRollingHash` | ハッシュ取得 $O(1)$<br>LCP $O(\log N)$ | `RollingHash.hpp` |
+| オフライン区間クエリ・伸縮更新 (Mo's algorithm) | `MosAlgorithm` (`Mo`) | $O(N \sqrt{Q})$ | `MosAlgorithm.hpp` |
+| 尺取り法（単調性のある区間条件の極大区間列挙） | `two_pointers` | $O(N)$ | `TwoPointers.hpp` |
+| 文字列一致判定・点更新クエリ・回文判定 | `DoubleRollingHash` | ハッシュ取得 $O(1)$ / 更新 $O(\log N)$<br>LCP $O(\log N)$ | `DoubleRollingHash.hpp` |
 | 文字列の任意位置挿入・削除・区間文字種数 | `DynamicStringTreap` | 各種操作 $O(\log N)$ | `DynamicStringTreap.hpp` |
 | 複数文字列のプレフィックス検索・辞書 | `Trie` / `MapTrie<T>` | 挿入・検索 $O(|S|)$ | `Trie.hpp` |
 | 単一始点最短経路 (重み付き正辺グラフ) | `dijkstra` | $O((V + E) \log V)$ | `Dijkstra.hpp` |
 | 依存関係の順序付け・閉路検出・DAG判定 | `topological_sort` | $O(V + E)$ | `TopologicalSort.hpp` |
 | 木のすべての頂点を根としたときの木DP | `Rerooting<...>` | $O(N)$ | `Rerooting.hpp` |
+| 木の部分木クエリ・LCA・頂点間距離 | `EulerTour` | 構築 $O(N \log N)$<br>LCA $O(1)$ | `EulerTour.hpp` |
 | 高速素数判定 ($N \le 10^{18}$) | `miller_rabin(n)` | $O(k \log^3 n)$ | `NumberTheory.hpp` |
 | 高速素因数分解 ($N \le 10^{18}$) | `pollard_rho(n)` / `factorize(n)` | $O(N^{1/4})$ | `NumberTheory.hpp` |
 | 拡張ユークリッド互除法・中国剰余定理 | `extgcd`, `modinv`, `crt` | $O(\log(\min(a, b)))$ | `NumberTheory.hpp` |
@@ -2043,32 +2049,268 @@ struct CoordinateCompression {
 
 </details>
 
+#### MosAlgorithm (Mo's algorithm)
+オフライン区間クエリを平方分割と伸縮操作により効率的に処理するアルゴリズムです。偶奇ソートによる定数倍最適化を内蔵しています。
+- **ファイル**: `mylib/MosAlgorithm.hpp` (または `mylib/Mo.hpp`)
+- **計算量**: $O(N \sqrt{Q})$（伸縮操作が $O(1)$ の場合）
+
+```cpp
+#include "mylib/MosAlgorithm.hpp" // または "mylib/Mo.hpp"
+
+int n = 8;
+MosAlgorithm mo(n); // using Mo = MosAlgorithm; も利用可能
+
+// クエリ [l, r) を追加 (0-indexed 半開区間)
+mo.add_query(0, 4);
+mo.add_query(2, 6);
+
+vector<int> ans(2);
+vector<int> cnt(100, 0);
+int distinct_cnt = 0;
+
+auto add = [&](int idx) {
+    if (cnt[a[idx]] == 0) distinct_cnt++;
+    cnt[a[idx]]++;
+};
+auto del = [&](int idx) {
+    cnt[a[idx]]--;
+    if (cnt[a[idx]] == 0) distinct_cnt--;
+};
+auto out = [&](int q_id) {
+    ans[q_id] = distinct_cnt;
+};
+
+mo.run(add, del, out);
+```
+
+<details>
+<summary><b>ソースコードを展開 (MosAlgorithm.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <bits/stdc++.h>
+
+using namespace std;
+
+struct MosAlgorithm {
+  int n;
+  struct Query {
+    int l, r, id;
+  };
+  vector<Query> queries;
+  int bucket_size;
+
+  MosAlgorithm(int n = 0, int bucket_size = -1)
+      : n(n), bucket_size(bucket_size) {}
+
+  void add_query(int l, int r) {
+    queries.push_back({l, r, (int)queries.size()});
+  }
+
+  template <typename Add, typename Del, typename Out>
+  void run(const Add &add, const Del &del, const Out &out) {
+    int q = queries.size();
+    if (q == 0)
+      return;
+
+    int bs = bucket_size;
+    if (bs <= 0) {
+      bs = max(1, (int)(n / max(1.0, sqrt(q * 2.0 / 3.0))));
+    }
+
+    sort(queries.begin(), queries.end(), [&](const Query &a, const Query &b) {
+      int ablock = a.l / bs, bblock = b.l / bs;
+      if (ablock != bblock)
+        return ablock < bblock;
+      return (ablock & 1) ? (a.r > b.r) : (a.r < b.r);
+    });
+
+    int cur_l = 0, cur_r = 0;
+    for (const auto &qry : queries) {
+      while (cur_l > qry.l) {
+        cur_l--;
+        add(cur_l);
+      }
+      while (cur_r < qry.r) {
+        add(cur_r);
+        cur_r++;
+      }
+      while (cur_l < qry.l) {
+        del(cur_l);
+        cur_l++;
+      }
+      while (cur_r > qry.r) {
+        cur_r--;
+        del(cur_r);
+      }
+      out(qry.id);
+    }
+  }
+
+  template <typename AddL, typename AddR, typename DelL, typename DelR,
+            typename Out>
+  void run(const AddL &add_l, const AddR &add_r, const DelL &del_l,
+           const DelR &del_r, const Out &out) {
+    int q = queries.size();
+    if (q == 0)
+      return;
+
+    int bs = bucket_size;
+    if (bs <= 0) {
+      bs = max(1, (int)(n / max(1.0, sqrt(q * 2.0 / 3.0))));
+    }
+
+    sort(queries.begin(), queries.end(), [&](const Query &a, const Query &b) {
+      int ablock = a.l / bs, bblock = b.l / bs;
+      if (ablock != bblock)
+        return ablock < bblock;
+      return (ablock & 1) ? (a.r > b.r) : (a.r < b.r);
+    });
+
+    int cur_l = 0, cur_r = 0;
+    for (const auto &qry : queries) {
+      while (cur_l > qry.l) {
+        cur_l--;
+        add_l(cur_l);
+      }
+      while (cur_r < qry.r) {
+        add_r(cur_r);
+        cur_r++;
+      }
+      while (cur_l < qry.l) {
+        del_l(cur_l);
+        cur_l++;
+      }
+      while (cur_r > qry.r) {
+        cur_r--;
+        del_r(cur_r);
+      }
+      out(qry.id);
+    }
+  }
+};
+
+using Mo = MosAlgorithm;
+```
+
+</details>
+
+#### TwoPointers (尺取り法)
+単調性のある区間条件に対し、各左端 `l` に対する極大な右端 `r`（半開区間 `[l, r)`）を $O(N)$ で走査するヘルパー関数です。`l == r` の追い越し防止や境界チェックを自動処理します。
+- **ファイル**: `mylib/TwoPointers.hpp`
+- **計算量**: $O(N)$（状態更新が $O(1)$ の場合）
+
+```cpp
+#include "mylib/TwoPointers.hpp"
+
+long long sum = 0, ans = 0;
+
+// 使い方 1: eval(l, r) で極大区間 [l, r) ごとに処理
+two_pointers(
+    n,
+    [&](int r) { return sum + a[r] <= k; }, // can_add(r): 追加可能か
+    [&](int r) { sum += a[r]; },            // add(r): 右端を追加
+    [&](int l) { sum -= a[l]; },            // del(l): 左端を削除
+    [&](int l, int r) { ans += r - l; }     // eval(l, r): 極大区間 [l, r) の評価
+);
+
+// 使い方 2: eval を省略して各 l に対する極大右端 max_r[l] の配列を取得
+auto max_r = two_pointers(
+    n,
+    [&](int r) { return sum + a[r] <= k; },
+    [&](int r) { sum += a[r]; },
+    [&](int l) { sum -= a[l]; }
+);
+```
+
+<details>
+<summary><b>ソースコードを展開 (TwoPointers.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <bits/stdc++.h>
+
+using namespace std;
+
+template <typename CanAdd, typename Add, typename Del, typename Eval>
+void two_pointers(int n, const CanAdd &can_add, const Add &add, const Del &del,
+                  const Eval &eval) {
+  int r = 0;
+  for (int l = 0; l < n; l++) {
+    while (r < n && can_add(r)) {
+      add(r);
+      r++;
+    }
+    eval(l, r);
+    if (l == r) {
+      r++;
+    } else {
+      del(l);
+    }
+  }
+}
+
+template <typename CanAdd, typename Add, typename Del>
+vector<int> two_pointers(int n, const CanAdd &can_add, const Add &add,
+                         const Del &del) {
+  vector<int> max_r(n);
+  two_pointers(
+      n, can_add, add, del, [&](int l, int r) { max_r[l] = r; });
+  return max_r;
+}
+```
+
+</details>
+
 ---
 
 ### 2. 文字列 (Strings)
 
-#### RollingHash (安全なダブルローリングハッシュ)
+#### DoubleRollingHash (安全なダブルローリングハッシュ・点更新対応)
 $2^{61}-1$（メルセンヌ素数）を法とし、実行時に安全な乱数基数を生成する耐撃墜性（Anti-Hack）の高いローリングハッシュです。
-- **ファイル**: `mylib/RollingHash.hpp`（互換: `DoubleRollingHash.hpp`）
-- **計算量**: 構築 $O(N)$、部分文字列ハッシュ $O(1)$、ハッシュ結合 $O(1)$、最長共通接頭辞 (LCP) $O(\log N)$
+静的文字列に対する $O(1)$ ハッシュ取得・LCP計算に加え、セグメント木連携による**点更新クエリ ($O(\log N)$)** や**回文判定**、**1文字変更仮定ハッシュ計算 ($O(1)$)** をサポートしています。
+- **ファイル**: `mylib/DoubleRollingHash.hpp`
+- **計算量**: 
+  - 構築: $O(N)$
+  - 区間ハッシュ `get(l, r)`: 更新前 $O(1)$、点更新後 $O(\log N)$
+  - 点更新 `set(idx, c)` / `update(idx, c)`: $O(\log N)$
+  - 1文字変更仮定 `get_with_change(l, r, idx, c)`: $O(1)$
+  - 回文判定 `is_palindrome(l, r)` / 反転ハッシュ `get_reversed(l, r)`: $O(\log N)$
+  - 最長共通接頭辞 (LCP): $O(\log N)$
 
 ```cpp
-#include "mylib/RollingHash.hpp"
+#include "mylib/DoubleRollingHash.hpp"
 
 string s = "abracadabra";
-DoubleRollingHash rh(s);
+DoubleRollingHash rh(s); // using RollingHash = DoubleRollingHash; も利用可能
 
-// [l, r) のハッシュ値を取得
+// [l, r) のハッシュ値を取得 (更新前は O(1))
 auto h1 = rh.get(0, 4); // "abra"
 auto h2 = rh.get(7, 11); // "abra"
 assert(h1 == h2);
 
-// LCP (最長共通接頭辞) の長さを二分探索で取得
-int len = rh.lcp(rh, 0, 7); // s[0...] と s[7...] の LCP -> 4
+// 1. 点更新クエリ: 位置 idx の文字を変更 (O(log N))
+rh.set(0, 'o'); // "obracadabra"
+assert(rh.get(0, 4) != h1);
+
+// 2. 変更仮定クエリ: 実際には変更せず、位置 idx を変更した場合のハッシュ値を O(1) で取得
+auto h_hypo = rh.get_with_change(0, 4, 0, 'a'); // 位置 0 を 'a' に戻したと仮定
+assert(h_hypo == h1);
+
+// 3. 回文判定クエリ: 区間 [l, r) が回文か判定 (O(log N))
+DoubleRollingHash pal("abacaba");
+assert(pal.is_palindrome(0, 7)); // true
+pal.set(3, 'x'); // "abaxaba"
+assert(pal.is_palindrome(0, 7)); // true
+pal.set(1, 'z'); // "azaxaba"
+assert(!pal.is_palindrome(0, 7)); // false
+
+// 4. LCP (最長共通接頭辞) の長さを二分探索で取得
+int len = rh.lcp(rh, 1, 8); // s[1...] と s[8...] の LCP
 ```
 
 <details>
-<summary><b>ソースコードを展開 (RollingHash.hpp)</b></summary>
+<summary><b>ソースコードを展開 (DoubleRollingHash.hpp)</b></summary>
 
 ```cpp
 #pragma once
@@ -2083,14 +2325,23 @@ int len = rh.lcp(rh, 0, 7); // s[0...] と s[7...] の LCP -> 4
 
 using namespace std;
 
-// 2^61 - 1 を法とする安全なダブルローリングハッシュ
 struct DoubleRollingHash {
   static const uint64_t mod = (1ULL << 61) - 1;
   uint64_t base1, base2;
   vector<uint64_t> hash1, power1;
   vector<uint64_t> hash2, power2;
+  vector<uint64_t> origin;
+  int n;
 
-  // 2^61 - 1 を法とする安全かつ高速な乗算
+  struct SegNode {
+    uint64_t h1, h2;
+    uint64_t rh1, rh2;
+    int len;
+  };
+  vector<SegNode> seg;
+  int seg_sz;
+  bool seg_built;
+
   static inline uint64_t mul(uint64_t a, uint64_t b) {
     __uint128_t t = (__uint128_t)a * b;
     t = (t >> 61) + (t & mod);
@@ -2099,7 +2350,6 @@ struct DoubleRollingHash {
     return (uint64_t)t;
   }
 
-  // 乱数による基数生成
   static inline uint64_t generate_base() {
     static mt19937_64 mt(
         chrono::steady_clock::now().time_since_epoch().count());
@@ -2107,7 +2357,6 @@ struct DoubleRollingHash {
     return rand(mt);
   }
 
-  // クラス全体で共有するデフォルト基数 (複数インスタンス間でハッシュを比較可能にする)
   static inline pair<uint64_t, uint64_t> get_default_bases() {
     static uint64_t b1 = 0, b2 = 0;
     if (b1 == 0) {
@@ -2120,20 +2369,18 @@ struct DoubleRollingHash {
     return {b1, b2};
   }
 
-  DoubleRollingHash() : base1(0), base2(0) {}
+  DoubleRollingHash()
+      : base1(0), base2(0), n(0), seg_sz(0), seg_built(false) {}
 
-  // 文字列から構築 (共有基数を使用)
   DoubleRollingHash(const string &s) {
     auto [b1, b2] = get_default_bases();
     init(s, b1, b2);
   }
 
-  // 基数を明示的に指定して構築
   DoubleRollingHash(const string &s, uint64_t b1, uint64_t b2) {
     init(s, b1, b2);
   }
 
-  // 数列 vector<T> から構築 (共有基数を使用)
   template <typename T> DoubleRollingHash(const vector<T> &v) {
     auto [b1, b2] = get_default_bases();
     init(v, b1, b2);
@@ -2153,14 +2400,19 @@ struct DoubleRollingHash {
   void init(const vector<T> &v, uint64_t b1, uint64_t b2) {
     base1 = b1;
     base2 = b2;
-    int n = v.size();
+    n = v.size();
+    origin.resize(n);
+    for (int i = 0; i < n; i++) {
+      origin[i] = (uint64_t)v[i] % mod;
+    }
+
     hash1.assign(n + 1, 0);
     power1.assign(n + 1, 1);
     hash2.assign(n + 1, 0);
     power2.assign(n + 1, 1);
 
     for (int i = 0; i < n; i++) {
-      uint64_t val = (uint64_t)v[i] % mod;
+      uint64_t val = origin[i];
       hash1[i + 1] = mul(hash1[i], base1) + val;
       if (hash1[i + 1] >= mod)
         hash1[i + 1] -= mod;
@@ -2171,23 +2423,105 @@ struct DoubleRollingHash {
         hash2[i + 1] -= mod;
       power2[i + 1] = mul(power2[i], base2);
     }
+    seg_built = false;
   }
 
-  // [l, r) の部分列のハッシュ値をペアで取得 (0-indexed)
   pair<uint64_t, uint64_t> get(int l, int r) const {
-    assert(0 <= l && l <= r && r < (int)hash1.size());
-    uint64_t res1 = hash1[r] + mod - mul(hash1[l], power1[r - l]);
-    if (res1 >= mod)
-      res1 -= mod;
+    assert(0 <= l && l <= r && r <= n);
+    if (l == r)
+      return {0, 0};
+    if (!seg_built) {
+      uint64_t res1 = hash1[r] + mod - mul(hash1[l], power1[r - l]);
+      if (res1 >= mod)
+        res1 -= mod;
 
-    uint64_t res2 = hash2[r] + mod - mul(hash2[l], power2[r - l]);
-    if (res2 >= mod)
-      res2 -= mod;
+      uint64_t res2 = hash2[r] + mod - mul(hash2[l], power2[r - l]);
+      if (res2 >= mod)
+        res2 -= mod;
 
-    return {res1, res2};
+      return {res1, res2};
+    }
+
+    SegNode L_res{0, 0, 0, 0, 0}, R_res{0, 0, 0, 0, 0};
+    int L = l + seg_sz, R = r + seg_sz;
+    while (L < R) {
+      if (L & 1)
+        L_res = merge_node(L_res, seg[L++]);
+      if (R & 1)
+        R_res = merge_node(seg[--R], R_res);
+      L >>= 1;
+      R >>= 1;
+    }
+    SegNode total = merge_node(L_res, R_res);
+    return {total.h1, total.h2};
   }
 
-  // ハッシュ同士の結合 (h1 の後ろに長さ len2 の h2 を連結)
+  template <typename T> void set(int idx, T val) {
+    assert(0 <= idx && idx < n);
+    ensure_seg_tree();
+    uint64_t v = (uint64_t)val % mod;
+    origin[idx] = v;
+    int k = seg_sz + idx;
+    seg[k] = make_leaf(v);
+    k >>= 1;
+    while (k > 0) {
+      seg[k] = merge_node(seg[2 * k], seg[2 * k + 1]);
+      k >>= 1;
+    }
+  }
+
+  template <typename T> void update(int idx, T val) { set(idx, val); }
+
+  template <typename T>
+  pair<uint64_t, uint64_t> get_with_change(int l, int r, int idx,
+                                          T new_val) const {
+    assert(0 <= l && l <= r && r <= n);
+    auto [h1, h2] = get(l, r);
+    if (idx < l || idx >= r)
+      return {h1, h2};
+
+    uint64_t old_v = origin[idx];
+    uint64_t new_v = (uint64_t)new_val % mod;
+    int shift = r - 1 - idx;
+
+    uint64_t diff1 = mul((new_v + mod - old_v) % mod, power1[shift]);
+    h1 += diff1;
+    if (h1 >= mod)
+      h1 -= mod;
+
+    uint64_t diff2 = mul((new_v + mod - old_v) % mod, power2[shift]);
+    h2 += diff2;
+    if (h2 >= mod)
+      h2 -= mod;
+
+    return {h1, h2};
+  }
+
+  pair<uint64_t, uint64_t> get_reversed(int l, int r) {
+    assert(0 <= l && l <= r && r <= n);
+    if (l == r)
+      return {0, 0};
+    ensure_seg_tree();
+    SegNode L_res{0, 0, 0, 0, 0}, R_res{0, 0, 0, 0, 0};
+    int L = l + seg_sz, R = r + seg_sz;
+    while (L < R) {
+      if (L & 1)
+        L_res = merge_node(L_res, seg[L++]);
+      if (R & 1)
+        R_res = merge_node(seg[--R], R_res);
+      L >>= 1;
+      R >>= 1;
+    }
+    SegNode total = merge_node(L_res, R_res);
+    return {total.rh1, total.rh2};
+  }
+
+  bool is_palindrome(int l, int r) {
+    if (l >= r)
+      return true;
+    return get(l, r) == get_reversed(l, r);
+  }
+
   pair<uint64_t, uint64_t> concat(pair<uint64_t, uint64_t> h1,
                                  pair<uint64_t, uint64_t> h2, int len2) const {
     uint64_t res1 = mul(h1.first, power1[len2]) + h2.first;
@@ -2201,9 +2535,8 @@ struct DoubleRollingHash {
     return {res1, res2};
   }
 
-  // 2つの文字列 (または同一文字列の異なる区間) の最長共通接頭辞 (LCP) の長さを O(log N) で取得
   int lcp(const DoubleRollingHash &other, int l1 = 0, int l2 = 0) const {
-    int max_len = min((int)hash1.size() - 1 - l1, (int)other.hash1.size() - 1 - l2);
+    int max_len = min(n - l1, other.n - l2);
     int low = 0, high = max_len + 1;
     while (high - low > 1) {
       int mid = (low + high) / 2;
@@ -2215,10 +2548,55 @@ struct DoubleRollingHash {
     }
     return low;
   }
+
+private:
+  SegNode make_leaf(uint64_t val) const {
+    val %= mod;
+    return {val, val, val, val, 1};
+  }
+
+  SegNode merge_node(const SegNode &L, const SegNode &R) const {
+    if (L.len == 0)
+      return R;
+    if (R.len == 0)
+      return L;
+
+    uint64_t h1 = mul(L.h1, power1[R.len]) + R.h1;
+    if (h1 >= mod)
+      h1 -= mod;
+    uint64_t h2 = mul(L.h2, power2[R.len]) + R.h2;
+    if (h2 >= mod)
+      h2 -= mod;
+
+    uint64_t rh1 = mul(R.rh1, power1[L.len]) + L.rh1;
+    if (rh1 >= mod)
+      rh1 -= mod;
+    uint64_t rh2 = mul(R.rh2, power2[L.len]) + L.rh2;
+    if (rh2 >= mod)
+      rh2 -= mod;
+
+    return {h1, h2, rh1, rh2, L.len + R.len};
+  }
+
+  void ensure_seg_tree() {
+    if (seg_built)
+      return;
+    seg_sz = 1;
+    while (seg_sz < n)
+      seg_sz <<= 1;
+    seg.assign(2 * seg_sz, {0, 0, 0, 0, 0});
+    for (int i = 0; i < n; i++) {
+      seg[seg_sz + i] = make_leaf(origin[i]);
+    }
+    for (int i = seg_sz - 1; i >= 1; i--) {
+      seg[i] = merge_node(seg[2 * i], seg[2 * i + 1]);
+    }
+    seg_built = true;
+  }
 };
 
-// エイリアス定義
 using RollingHash = DoubleRollingHash;
+
 ```
 
 </details>
@@ -3008,6 +3386,148 @@ private:
       Data without_d = merge(head[i], tail[i + 1]);
       Data to_child = apply_edge(add_node(without_d, c), c, d, d.cost);
       dfs2(d, c, to_child);
+    }
+  }
+};
+```
+
+</details>
+
+#### EulerTour (オイラーツアー・LCA)
+木構造を平坦化し、部分木クエリを区間クエリに変換する構造体です。内蔵の Sparse Table により、LCA（最小共通祖先）や頂点間距離を $O(1)$ で取得可能です。
+- **ファイル**: `mylib/EulerTour.hpp`
+- **計算量**: 構築 $O(N \log N)$、部分木範囲 $O(1)$、LCA・距離取得 $O(1)$、祖先判定 $O(1)$
+
+```cpp
+#include "mylib/EulerTour.hpp"
+
+int n = 5;
+EulerTour et(n);
+et.add_edge(0, 1);
+et.add_edge(0, 2);
+et.add_edge(1, 3);
+et.add_edge(1, 4);
+
+et.build(0); // 根を 0 として構築
+
+// 部分木 u に対応する半開区間 [l, r)
+auto [l, r] = et.subtree_range(1); // BIT やセグ木に乗せて部分木更新・取得
+
+// 部分木のサイズ
+int sz = et.subtree_size(1); // 3
+
+// LCA (最小共通祖先)
+int anc = et.lca(3, 4); // 1
+
+// 頂点間距離 (辺数)
+int d = et.dist(3, 2); // 3
+
+// 祖先判定
+bool ok = et.is_ancestor(0, 3); // true
+```
+
+<details>
+<summary><b>ソースコードを展開 (EulerTour.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <bits/stdc++.h>
+
+using namespace std;
+
+struct EulerTour {
+  int n;
+  vector<vector<int>> g;
+  vector<int> in, out;     // 部分木 u に対応する区間 [in[u], out[u]) (サイズ n)
+  vector<int> tour;        // 訪問時刻順の頂点列 (サイズ n)
+  vector<int> depth;       // 各頂点の深さ (根は 0)
+  vector<int> parent;      // 親頂点 (根は -1)
+
+  vector<int> node_visit;  // 頂点訪問履歴 (サイズ 2*n - 1)
+  vector<int> first_visit; // 各頂点が node_visit に最初に現れるインデックス
+  vector<vector<int>> st;  // Sparse Table
+
+  EulerTour(int n = 0)
+      : n(n), g(n), in(n), out(n), tour(n), depth(n, 0), parent(n, -1),
+        first_visit(n, 0) {}
+
+  void add_edge(int u, int v) {
+    g[u].push_back(v);
+    g[v].push_back(u);
+  }
+
+  void build(int root = 0) {
+    int timer = 0;
+    node_visit.clear();
+    node_visit.reserve(2 * n);
+    dfs(root, -1, 0, timer);
+    build_lca();
+  }
+
+  pair<int, int> subtree_range(int u) const {
+    return {in[u], out[u]};
+  }
+
+  int subtree_size(int u) const {
+    return out[u] - in[u];
+  }
+
+  bool is_ancestor(int u, int v) const {
+    return in[u] <= in[v] && out[v] <= out[u];
+  }
+
+  int lca(int u, int v) const {
+    int l = first_visit[u], r = first_visit[v];
+    if (l > r)
+      swap(l, r);
+    int d = r - l + 1;
+    int k = 31 - __builtin_clz(d);
+    int idx1 = st[k][l];
+    int idx2 = st[k][r - (1 << k) + 1];
+    return depth[node_visit[idx1]] < depth[node_visit[idx2]] ? node_visit[idx1]
+                                                             : node_visit[idx2];
+  }
+
+  int dist(int u, int v) const {
+    return depth[u] + depth[v] - 2 * depth[lca(u, v)];
+  }
+
+private:
+  void dfs(int u, int p, int d, int &timer) {
+    parent[u] = p;
+    depth[u] = d;
+    in[u] = timer;
+    tour[timer] = u;
+    timer++;
+
+    first_visit[u] = node_visit.size();
+    node_visit.push_back(u);
+
+    for (int v : g[u]) {
+      if (v == p)
+        continue;
+      dfs(v, u, d + 1, timer);
+      node_visit.push_back(u);
+    }
+    out[u] = timer;
+  }
+
+  void build_lca() {
+    int m = node_visit.size();
+    if (m == 0)
+      return;
+    int log_m = 32 - __builtin_clz(m);
+    st.assign(log_m, vector<int>(m));
+    for (int i = 0; i < m; i++)
+      st[0][i] = i;
+    for (int k = 1; k < log_m; k++) {
+      int span = 1 << (k - 1);
+      for (int i = 0; i + (1 << k) <= m; i++) {
+        int idx1 = st[k - 1][i];
+        int idx2 = st[k - 1][i + span];
+        st[k][i] = (depth[node_visit[idx1]] < depth[node_visit[idx2]]) ? idx1
+                                                                       : idx2;
+      }
     }
   }
 };
@@ -4322,20 +4842,22 @@ inline Real convex_diameter(const Polygon &P) {
 #include "DoubleRollingHash.hpp"
 #include "DynamicSegTree.hpp"
 #include "DynamicStringTreap.hpp"
+#include "EulerTour.hpp"
 #include "Geometry.hpp"
 #include "LazySqrtDecomposition.hpp"
 #include "LinearDiophantine.hpp"
 #include "Matrix.hpp"
+#include "MosAlgorithm.hpp"
 #include "NumberTheory.hpp"
 #include "OrderStatisticSet.hpp"
 #include "PersistentSegTree.hpp"
 #include "Rerooting.hpp"
-#include "RollingHash.hpp"
 #include "SegTree2D.hpp"
 #include "SparseTable.hpp"
 #include "SqrtDecomposition.hpp"
 #include "TopologicalSort.hpp"
 #include "Trie.hpp"
+#include "TwoPointers.hpp"
 #include "UnionFind.hpp"
 #include "WeightedUnionFind.hpp"
 ```

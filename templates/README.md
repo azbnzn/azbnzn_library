@@ -19,6 +19,7 @@
 | **黄金分割探索** | `golden_section_search.cpp` | `golden_section_search.md` | 実数: $O(\text{iter})$ | 凸関数の極値探索、評価値再利用により関数呼び出し回数を約 40% 削減 |
 | **木の直径 (任意重み対応)** | `tree_diameter.cpp` | `tree_diameter.md` | $O(N)$ | 木の最遠点対・直径の長さ、直径パスの頂点列復元、木の中心頂点取得 |
 | **木のオイラーツアー** | `euler_tour.cpp` | `euler_tour.md` | $O(N)$ | 木の 1 次元配列平坦化、部分木を区間 `[in[u], out[u])` に対応させてセグ木/BITで処理 |
+| **尺取り法 (Two Pointers)** | `two_pointers.cpp` | `two_pointers.md` | $O(N)$ | 単調性のある区間条件に対する極大区間・最短区間・条件を満たす区間数の高速計算 |
 
 ---
 
