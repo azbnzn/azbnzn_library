@@ -35,8 +35,10 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
     - [TopologicalSort (トポロジカルソート)](#topologicalsort-トポロジカルソート)
     - [Rerooting (全方位木DP)](#rerooting-全方位木dp)
     - [EulerTour (オイラーツアー・LCA)](#eulertour)
+    - [LowestCommonAncestor (LCA・木上の重み付き最短距離・パスJump)](#lowestcommonancestor)
   - [4. 数学・数論 (Math & Number Theory)](#4-数学数論-math--number-theory)
     - [NumberTheory (高速数論・素因数分解・CRT)](#numbertheory-高速数論素因数分解crt)
+    - [Prime (巨大素数判定・素因数分解・線形篩・区間篩)](#prime)
     - [BiCoef (二項係数・順列・重複組合せ)](#bicoef-二項係数順列重複組合せ)
     - [LinearDiophantine (一次不定方程式)](#lineardiophantine-一次不定方程式)
     - [Matrix (半環対応汎用行列累乗)](#matrix-半環対応汎用行列累乗)
@@ -85,7 +87,9 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
 | 依存関係の順序付け・閉路検出・DAG判定 | `topological_sort` | $O(V + E)$ | `TopologicalSort.hpp` |
 | 木のすべての頂点を根としたときの木DP | `Rerooting<...>` | $O(N)$ | `Rerooting.hpp` |
 | 木の部分木クエリ・LCA・頂点間距離 | `EulerTour` | 構築 $O(N \log N)$<br>LCA $O(1)$ | `EulerTour.hpp` |
+| 木の2点間LCA・重み付き距離・パスJump | `LowestCommonAncestor<T>` (`LCA`) | 構築 $O(N \log N)$<br>クエリ $O(\log N)$ | `LowestCommonAncestor.hpp` |
 | 高速素数判定 ($N \le 10^{18}$) | `miller_rabin(n)` | $O(k \log^3 n)$ | `NumberTheory.hpp` |
+| 素数判定・素因数分解・線形篩・区間篩 | `Prime` / `PrimeSieve` | クエリ $O(\log X)$ / $O(N^{1/4})$ | `Prime.hpp` |
 | 高速素因数分解 ($N \le 10^{18}$) | `pollard_rho(n)` / `factorize(n)` | $O(N^{1/4})$ | `NumberTheory.hpp` |
 | 拡張ユークリッド互除法・中国剰余定理 | `extgcd`, `modinv`, `crt` | $O(\log(\min(a, b)))$ | `NumberTheory.hpp` |
 | 順列・組合せ ($nPr, nCr, nHr$) の高速計算 | `BiCoef<mint>` | 前計算 $O(N)$<br>クエリ $O(1)$ | `BiCoef.hpp` |
@@ -3535,6 +3539,174 @@ private:
 
 </details>
 
+#### LowestCommonAncestor (LCA・木上の重み付き最短距離・パスJump)
+ダブリング（Binary Lifting）により、木の2頂点間の最小共通祖先（LCA）や最短距離（重み付き対応）、$k$ 個親の取得、パス上の判定・探索を高速に行う構造体です。
+- **ファイル**: `mylib/LowestCommonAncestor.hpp`（エイリアス: `mylib/LCA.hpp`）
+- **計算量**: 構築 $O(N \log N)$、クエリ $O(\log N)$（LCA・距離・jump・パス判定など）
+
+```cpp
+#include "mylib/LowestCommonAncestor.hpp" // または "mylib/LCA.hpp"
+
+int n = 5;
+LowestCommonAncestor<long long> lca(n); // using LCA = LowestCommonAncestor<long long>; も利用可能
+
+// 辺の追加 (u, v, cost = 1)
+lca.add_edge(0, 1, 2);
+lca.add_edge(0, 2, 10);
+lca.add_edge(1, 3, 4);
+lca.add_edge(1, 4, 5);
+
+lca.build(0); // 根を 0 として構築
+
+// LCA (最小共通祖先)
+int a = lca.lca(3, 4); // 1
+
+// 2頂点間の重み付き最短距離
+long long d = lca.dist(3, 4); // 4 + 5 = 9
+long long d2 = lca.dist(3, 2); // 4 + 2 + 10 = 16
+
+// 2頂点間の辺数 (重みなし距離)
+int edges = lca.dist_edges(3, 4); // 2
+
+// 根方向に k 個登った頂点 (存在しなければ -1)
+int p = lca.jump(3, 1); // 1 (親)
+int root = lca.jump(3, 2); // 0 (根)
+
+// パス u-v 上で u から k ステップ進んだ頂点
+int mid = lca.jump_on_path(3, 4, 1); // 1
+
+// 頂点 x が パス u-v 上にあるか判定
+bool on_path = lca.is_on_path(3, 4, 1); // true
+```
+
+<details>
+<summary><b>ソースコードを展開 (LowestCommonAncestor.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <bits/stdc++.h>
+
+using namespace std;
+
+template <typename T = long long>
+struct LowestCommonAncestor {
+  struct Edge {
+    int to;
+    T cost;
+  };
+
+  int n;
+  int log_n;
+  vector<vector<Edge>> g;
+  vector<vector<int>> parent;
+  vector<int> depth;
+  vector<T> dist_from_root;
+
+  LowestCommonAncestor(int n = 0) : n(n), log_n(1) {
+    while ((1 << log_n) <= max(1, n)) log_n++;
+    g.resize(n);
+  }
+
+  void add_edge(int u, int v, T cost = 1) {
+    assert(0 <= u && u < n);
+    assert(0 <= v && v < n);
+    g[u].push_back({v, cost});
+    g[v].push_back({u, cost});
+  }
+
+  void build(int root = 0) {
+    assert(0 <= root && root < n);
+    parent.assign(log_n, vector<int>(n, -1));
+    depth.assign(n, 0);
+    dist_from_root.assign(n, 0);
+
+    auto dfs = [&](auto self, int u, int p, int d, T c) -> void {
+      parent[0][u] = p;
+      depth[u] = d;
+      dist_from_root[u] = c;
+      for (const auto &e : g[u]) {
+        if (e.to == p) continue;
+        self(self, e.to, u, d + 1, c + e.cost);
+      }
+    };
+    dfs(dfs, root, -1, 0, 0);
+
+    for (int k = 0; k + 1 < log_n; k++) {
+      for (int v = 0; v < n; v++) {
+        if (parent[k][v] < 0) {
+          parent[k + 1][v] = -1;
+        } else {
+          parent[k + 1][v] = parent[k][parent[k][v]];
+        }
+      }
+    }
+  }
+
+  int lca(int u, int v) const {
+    assert(0 <= u && u < n && 0 <= v && v < n);
+    if (depth[u] > depth[v]) swap(u, v);
+    for (int k = 0; k < log_n; k++) {
+      if ((depth[v] - depth[u]) >> k & 1) {
+        v = parent[k][v];
+      }
+    }
+    if (u == v) return u;
+    for (int k = log_n - 1; k >= 0; k--) {
+      if (parent[k][u] != parent[k][v]) {
+        u = parent[k][u];
+        v = parent[k][v];
+      }
+    }
+    return parent[0][u];
+  }
+
+  T dist(int u, int v) const {
+    int a = lca(u, v);
+    return dist_from_root[u] + dist_from_root[v] - 2 * dist_from_root[a];
+  }
+
+  int dist_edges(int u, int v) const {
+    int a = lca(u, v);
+    return depth[u] + depth[v] - 2 * depth[a];
+  }
+
+  int jump(int u, int k) const {
+    assert(0 <= u && u < n);
+    if (k < 0 || k > depth[u]) return -1;
+    for (int i = 0; i < log_n; i++) {
+      if (k >> i & 1) {
+        u = parent[i][u];
+        if (u < 0) return -1;
+      }
+    }
+    return u;
+  }
+
+  int kth_ancestor(int u, int k) const { return jump(u, k); }
+
+  bool is_on_path(int u, int v, int x) const {
+    assert(0 <= x && x < n);
+    return dist_edges(u, x) + dist_edges(x, v) == dist_edges(u, v);
+  }
+
+  int jump_on_path(int u, int v, int k) const {
+    int a = lca(u, v);
+    int d1 = depth[u] - depth[a];
+    int d2 = depth[v] - depth[a];
+    if (k < 0 || k > d1 + d2) return -1;
+    if (k <= d1) {
+      return jump(u, k);
+    } else {
+      return jump(v, d1 + d2 - k);
+    }
+  }
+};
+
+using LCA = LowestCommonAncestor<long long>;
+```
+
+</details>
+
 ---
 
 ### 4. 数学・数論 (Math & Number Theory)
@@ -3874,6 +4046,384 @@ inline pair<long long, long long> crt(const vector<long long> &r,
 }
 
 } // namespace NumberTheory
+```
+
+</details>
+
+#### Prime (巨大素数判定・素因数分解・線形篩・区間篩)
+素数判定・素因数分解・約数列挙・エラトステネス線形篩（osa_k法）・区間篩を網羅した素数特化ライブラリです。
+- **ファイル**: `mylib/Prime.hpp`
+- **計算量**:
+  - 巨大数素数判定 `is_prime(n)`: $O(\log N)$（$N \le 10^{18}$、Miller-Rabin）
+  - 高速素因数分解 `prime_factorize(n)`: $O(N^{1/4})$（$N \le 10^{18}$、Pollard's rho）
+  - 全約数列挙 `divisors(n)`: 約数個数に応じた計算量
+  - 線形篩 `PrimeSieve(MAX_N)`: 構築 $O(MAX_N)$、クエリ素因数分解 $O(\log X)$、素数判定 $O(1)$
+  - 区間篩 `segmented_sieve(L, R)`: $O((R - L) + \sqrt{R} \log \log \sqrt{R})$
+
+```cpp
+#include "mylib/Prime.hpp"
+
+// 1. 巨大数の素数判定 (Miller-Rabin, 10^18 まで高速)
+bool ok = is_prime(1000000000000037LL); // true
+
+// 2. 巨大数の素因数分解 (Pollard's rho)
+auto fac = prime_factorize(60LL); // {{2, 2}, {3, 1}, {5, 1}}
+auto divs = divisors(60LL);        // {1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60}
+long long d_cnt = count_divisors(60LL); // 12
+long long d_sum = sum_divisors(60LL);   // 168
+long long phi = euler_phi(60LL);        // 16 (互いに素な正整数の個数)
+
+// 3. 線形篩 / osa_k法 (クエリが多数ある場合に前計算 O(N))
+PrimeSieve sieve(1000000);
+bool is_p = sieve.is_prime(97); // O(1)
+int spf = sieve.min_factor(91); // 7 (最小素因数)
+auto f = sieve.prime_factorize(60); // O(log X) -> {{2, 2}, {3, 1}, {5, 1}}
+auto div_fast = sieve.divisors(60); // 約数列挙
+int mu = sieve.moebius(30);         // -1 (メビウス関数)
+
+// 4. 区間篩 (10^12 以下の区間 [L, R) の素数列挙)
+auto range_primes = segmented_sieve(10, 30); // {11, 13, 17, 19, 23, 29}
+```
+
+<details>
+<summary><b>ソースコードを展開 (Prime.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <algorithm>
+#include <cassert>
+#include <chrono>
+#include <cstdint>
+#include <iostream>
+#include <numeric>
+#include <random>
+#include <utility>
+#include <vector>
+
+using namespace std;
+
+namespace prime_internal {
+
+inline uint64_t mul_mod(uint64_t a, uint64_t b, uint64_t mod) {
+  return (uint64_t)((__uint128_t)a * b % mod);
+}
+
+inline uint64_t pow_mod(uint64_t a, uint64_t b, uint64_t mod) {
+  uint64_t res = 1 % mod;
+  a %= mod;
+  while (b > 0) {
+    if (b & 1)
+      res = mul_mod(res, a, mod);
+    a = mul_mod(a, a, mod);
+    b >>= 1;
+  }
+  return res;
+}
+
+inline uint64_t gcd_u64(uint64_t a, uint64_t b) {
+  while (b) {
+    a %= b;
+    swap(a, b);
+  }
+  return a;
+}
+
+inline uint64_t find_factor(uint64_t n);
+inline void factorize_rec(uint64_t n, vector<uint64_t> &res);
+
+} // namespace prime_internal
+
+inline bool is_prime(uint64_t n) {
+  if (n <= 1) return false;
+  if (n == 2 || n == 3 || n == 5 || n == 7) return true;
+  if (n % 2 == 0 || n % 3 == 0 || n % 5 == 0 || n % 7 == 0) return false;
+  if (n < 121) return true;
+
+  uint64_t d = n - 1;
+  int s = 0;
+  while ((d & 1) == 0) {
+    d >>= 1;
+    s++;
+  }
+
+  static const uint64_t bases[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37};
+  for (uint64_t a : bases) {
+    if (n <= a) break;
+    uint64_t x = prime_internal::pow_mod(a, d, n);
+    if (x == 1 || x == n - 1) continue;
+    bool composite = true;
+    for (int r = 1; r < s; r++) {
+      x = prime_internal::mul_mod(x, x, n);
+      if (x == n - 1) {
+        composite = false;
+        break;
+      }
+    }
+    if (composite) return false;
+  }
+  return true;
+}
+
+inline bool is_prime(long long n) {
+  if (n <= 1) return false;
+  return is_prime((uint64_t)n);
+}
+
+namespace prime_internal {
+
+inline uint64_t find_factor(uint64_t n) {
+  if (n % 2 == 0) return 2;
+  if (is_prime(n)) return n;
+
+  static mt19937_64 rng(chrono::steady_clock::now().time_since_epoch().count());
+  uniform_int_distribution<uint64_t> dist_c(1, n - 1);
+  uniform_int_distribution<uint64_t> dist_x(2, n - 1);
+
+  while (true) {
+    uint64_t c = dist_c(rng);
+    uint64_t x = dist_x(rng);
+    uint64_t y = x;
+    uint64_t d = 1;
+
+    auto f = [&](uint64_t v) { return (mul_mod(v, v, n) + c) % n; };
+
+    while (d == 1) {
+      x = f(x);
+      y = f(f(y));
+      d = gcd_u64((x > y ? x - y : y - x), n);
+    }
+    if (d != n) return d;
+  }
+}
+
+inline void factorize_rec(uint64_t n, vector<uint64_t> &res) {
+  if (n <= 1) return;
+  if (is_prime(n)) {
+    res.push_back(n);
+    return;
+  }
+  uint64_t factor = find_factor(n);
+  factorize_rec(factor, res);
+  factorize_rec(n / factor, res);
+}
+
+} // namespace prime_internal
+
+inline vector<long long> factorize(long long n) {
+  if (n <= 1) return {};
+  vector<uint64_t> res_u64;
+  prime_internal::factorize_rec((uint64_t)n, res_u64);
+  sort(res_u64.begin(), res_u64.end());
+  return vector<long long>(res_u64.begin(), res_u64.end());
+}
+
+inline vector<pair<long long, int>> prime_factorize(long long n) {
+  auto factors = factorize(n);
+  vector<pair<long long, int>> res;
+  for (long long p : factors) {
+    if (res.empty() || res.back().first != p) {
+      res.emplace_back(p, 1);
+    } else {
+      res.back().second++;
+    }
+  }
+  return res;
+}
+
+inline vector<long long> divisors(long long n) {
+  if (n <= 0) return {};
+  auto pairs = prime_factorize(n);
+  vector<long long> res = {1};
+  for (const auto &[p, exp] : pairs) {
+    int sz = res.size();
+    long long mult = 1;
+    for (int i = 0; i < exp; i++) {
+      mult *= p;
+      for (int j = 0; j < sz; j++) {
+        res.push_back(res[j] * mult);
+      }
+    }
+  }
+  sort(res.begin(), res.end());
+  return res;
+}
+
+inline long long count_divisors(long long n) {
+  if (n <= 0) return 0;
+  auto pairs = prime_factorize(n);
+  long long ans = 1;
+  for (const auto &[p, exp] : pairs) ans *= (exp + 1);
+  return ans;
+}
+
+inline long long sum_divisors(long long n) {
+  if (n <= 0) return 0;
+  auto pairs = prime_factorize(n);
+  long long ans = 1;
+  for (const auto &[p, exp] : pairs) {
+    long long cur = 1, mult = 1;
+    for (int i = 0; i < exp; i++) {
+      mult *= p;
+      cur += mult;
+    }
+    ans *= cur;
+  }
+  return ans;
+}
+
+inline long long euler_phi(long long n) {
+  if (n <= 0) return 0;
+  auto pairs = prime_factorize(n);
+  long long ans = n;
+  for (const auto &[p, exp] : pairs) ans -= ans / p;
+  return ans;
+}
+
+struct PrimeSieve {
+  int n;
+  vector<int> min_factor_table;
+  vector<int> primes;
+
+  PrimeSieve() : n(0) {}
+  explicit PrimeSieve(int n) : n(n), min_factor_table(n + 1, 0) {
+    for (int i = 2; i <= n; i++) {
+      if (min_factor_table[i] == 0) {
+        min_factor_table[i] = i;
+        primes.push_back(i);
+      }
+      for (int p : primes) {
+        if (p > min_factor_table[i] || (long long)i * p > n) break;
+        min_factor_table[i * p] = p;
+      }
+    }
+  }
+
+  bool is_prime(int x) const {
+    assert(1 <= x && x <= n);
+    return min_factor_table[x] == x;
+  }
+
+  int min_factor(int x) const {
+    assert(1 <= x && x <= n);
+    return (x == 1 ? 1 : min_factor_table[x]);
+  }
+
+  vector<int> factorize(int x) const {
+    assert(1 <= x && x <= n);
+    vector<int> res;
+    while (x > 1) {
+      res.push_back(min_factor_table[x]);
+      x /= min_factor_table[x];
+    }
+    return res;
+  }
+
+  vector<pair<int, int>> prime_factorize(int x) const {
+    auto f = factorize(x);
+    vector<pair<int, int>> res;
+    for (int p : f) {
+      if (res.empty() || res.back().first != p) {
+        res.emplace_back(p, 1);
+      } else {
+        res.back().second++;
+      }
+    }
+    return res;
+  }
+
+  vector<int> divisors(int x) const {
+    assert(1 <= x && x <= n);
+    auto pairs = prime_factorize(x);
+    vector<int> res = {1};
+    for (const auto &[p, exp] : pairs) {
+      int sz = res.size();
+      int mult = 1;
+      for (int i = 0; i < exp; i++) {
+        mult *= p;
+        for (int j = 0; j < sz; j++) {
+          res.push_back(res[j] * mult);
+        }
+      }
+    }
+    sort(res.begin(), res.end());
+    return res;
+  }
+
+  int count_divisors(int x) const {
+    auto pairs = prime_factorize(x);
+    int ans = 1;
+    for (const auto &[p, exp] : pairs) ans *= (exp + 1);
+    return ans;
+  }
+
+  long long sum_divisors(int x) const {
+    auto pairs = prime_factorize(x);
+    long long ans = 1;
+    for (const auto &[p, exp] : pairs) {
+      long long cur = 1, mult = 1;
+      for (int i = 0; i < exp; i++) {
+        mult *= p;
+        cur += mult;
+      }
+      ans *= cur;
+    }
+    return ans;
+  }
+
+  int euler_phi(int x) const {
+    assert(1 <= x && x <= n);
+    auto pairs = prime_factorize(x);
+    int ans = x;
+    for (const auto &[p, exp] : pairs) ans -= ans / p;
+    return ans;
+  }
+
+  int moebius(int x) const {
+    assert(1 <= x && x <= n);
+    int mu = 1;
+    while (x > 1) {
+      int p = min_factor_table[x];
+      x /= p;
+      if (x % p == 0) return 0;
+      mu = -mu;
+    }
+    return mu;
+  }
+};
+
+inline vector<long long> segmented_sieve(long long L, long long R) {
+  if (L < 2) L = 2;
+  if (L >= R) return {};
+
+  long long sqrt_R = 1;
+  while ((sqrt_R + 1) * (sqrt_R + 1) < R) sqrt_R++;
+
+  vector<bool> is_prime_small(sqrt_R + 1, true);
+  vector<long long> small_primes;
+  for (long long i = 2; i <= sqrt_R; i++) {
+    if (is_prime_small[i]) {
+      small_primes.push_back(i);
+      for (long long j = i * i; j <= sqrt_R; j += i) {
+        is_prime_small[j] = false;
+      }
+    }
+  }
+
+  vector<bool> is_prime_range(R - L, true);
+  for (long long p : small_primes) {
+    long long start = ((L + p - 1) / p) * p;
+    if (start < p * p) start = p * p;
+    for (long long j = start; j < R; j += p) {
+      is_prime_range[j - L] = false;
+    }
+  }
+
+  vector<long long> primes;
+  for (long long i = 0; i < R - L; i++) {
+    if (is_prime_range[i]) primes.push_back(L + i);
+  }
+  return primes;
+}
 ```
 
 </details>
@@ -4846,11 +5396,13 @@ inline Real convex_diameter(const Polygon &P) {
 #include "Geometry.hpp"
 #include "LazySqrtDecomposition.hpp"
 #include "LinearDiophantine.hpp"
+#include "LowestCommonAncestor.hpp"
 #include "Matrix.hpp"
 #include "MosAlgorithm.hpp"
 #include "NumberTheory.hpp"
 #include "OrderStatisticSet.hpp"
 #include "PersistentSegTree.hpp"
+#include "Prime.hpp"
 #include "Rerooting.hpp"
 #include "SegTree2D.hpp"
 #include "SparseTable.hpp"
