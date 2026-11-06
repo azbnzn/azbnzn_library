@@ -900,4 +900,22 @@ int main() {
 
   updateGutter();
   updateCursorPos();
+
+  // Check for transferred testcase from Stress Tester
+  try {
+    const transCode = localStorage.getItem("cpd_transfer_code");
+    const transIn = localStorage.getItem("cpd_transfer_input");
+    const transExp = localStorage.getItem("cpd_transfer_expected");
+    if (transCode || transIn || transExp) {
+      if (transCode) codeEditor.value = transCode;
+      if (transIn) inputStdin.value = transIn;
+      if (transExp) inputExpected.value = transExp;
+      localStorage.removeItem("cpd_transfer_code");
+      localStorage.removeItem("cpd_transfer_input");
+      localStorage.removeItem("cpd_transfer_expected");
+      updateGutter();
+      updateCursorPos();
+      setTimeout(runDebug, 200);
+    }
+  } catch (e) {}
 });

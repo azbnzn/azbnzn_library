@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parallel Stress Tester - 並列ストレステスター</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ヘッダー -->
+  <header>
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">🚀</span>
+        <div class="logo-text-group">
+          <span class="logo-title">AtCoder Parallel Stress Tester</span>
+          <span class="logo-subtitle">マルチコア並列実行エンジンによる超高速ストレステスト</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button id="btn-sync-tools-load" class="btn btn-sm btn-outline" title="tools/stress_test/ の main.cpp, naive.cpp, generator.cpp を読み込みます">
+        📂 tools/ から読込
+      </button>
+      <button id="btn-sync-tools-save" class="btn btn-sm btn-outline" title="現在のコードを tools/stress_test/ に上書き保存します">
+        💾 tools/ へ保存
+      </button>
+      <span class="badge badge-cpu" id="badge-cpu-cores">
+        ⚡️ CPU 検出中...
+      </span>
+      <span class="badge badge-tech">
+        Pipe In-Memory I/O
+      </span>
+    </div>
+  </header>
+
+  <!-- 制御ツールバー -->
+  <div class="control-bar">
+    <div class="control-group">
+      <button id="btn-start" class="btn btn-emerald btn-lg" title="並列ストレステストを開始します (Ctrl+Enter)">
+        ▶ 並列テスト開始
+      </button>
+      <button id="btn-stop" class="btn btn-danger btn-lg" disabled title="実行中のテストを中止します">
+        ⏹ 停止
+      </button>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">並列ワーカー数:</label>
+      <div class="slider-group">
+        <input type="range" id="input-workers-range" min="1" max="16" value="8" class="range-slider">
+        <span id="label-workers" class="worker-val-badge">8 コア</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">テスト回数:</label>
+      <select id="select-max-cases" class="select-box">
+        <option value="100">100 ケース</option>
+        <option value="500">500 ケース</option>
+        <option value="1000" selected>1,000 ケース</option>
+        <option value="5000">5,000 ケース</option>
+        <option value="10000">10,000 ケース</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">モード:</label>
+      <select id="select-mode" class="select-box">
+        <option value="stop" selected>🛑 最初のエラーで即時停止</option>
+        <option value="all">📦 全件実行 (最小ケース探索)</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label class="control-label">制限時間:</label>
+      <select id="select-timeout" class="select-box sm">
+        <option value="0.5">0.5 秒</option>
+        <option value="1.0">1.0 秒</option>
+        <option value="2.0" selected>2.0 秒</option>
+        <option value="5.0">5.0 秒</option>
+      </select>
+    </div>
+
+    <div class="control-group right-align">
+      <label class="checkbox-label" title="Solver を ASan/UBSan 付きでコンパイルし、未定義動作や配列外参照も自動検出します">
+        <input type="checkbox" id="check-sanitize-solver">
+        サニタイザ (ASan/UBSan)
+      </label>
+      <select id="select-preset" class="select-box sm">
+        <option value="">-- サンプル読込 --</option>
+        <option value="preset_sum">区間和バグ (典型WA)</option>
+        <option value="preset_modulo">MOD計算バグ (負数割余)</option>
+        <option value="preset_tle">無限ループバグ (TLE)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ライブダッシュボード (スピードメーター & 進捗) -->
+  <div class="metrics-dashboard">
+    <!-- スピードメーターカード -->
+    <div class="metric-card speed-card">
+      <div class="metric-label">テスト実行速度</div>
+      <div class="metric-value-row">
+        <span class="speed-num" id="metric-speed">0</span>
+        <span class="speed-unit">cases / 秒</span>
+      </div>
+      <div class="metric-sub" id="metric-workers-active">待機中</div>
+    </div>
+
+    <!-- 進捗バーカード -->
+    <div class="metric-card progress-card">
+      <div class="progress-header">
+        <span class="metric-label">進捗状況</span>
+        <span class="progress-ratio" id="metric-progress-text">0 / 1,000 (0%)</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+      </div>
+      <div class="progress-footer">
+        <span id="metric-status-msg">設定を選択して「並列テスト開始」を押してください</span>
+        <span id="metric-time-text">経過: 0.0s</span>
+      </div>
+    </div>
+
+    <!-- 判定内訳カード -->
+    <div class="metric-card counts-card">
+      <div class="metric-label">判定内訳</div>
+      <div class="counts-pills-row">
+        <span class="count-pill pill-ac" id="pill-ac">AC: 0</span>
+        <span class="count-pill pill-wa" id="pill-wa">WA: 0</span>
+        <span class="count-pill pill-re" id="pill-re">RE: 0</span>
+        <span class="count-pill pill-tle" id="pill-tle">TLE: 0</span>
+      </div>
+      <div class="metric-sub" id="metric-fail-summary">エラー未検出</div>
+    </div>
+  </div>
+
+  <!-- メインコンテンツ (左右分割レイアウト) -->
+  <main class="main-split">
+    
+    <!-- 左ペイン: 3コードエディタ -->
+    <div class="pane pane-codes">
+      <div class="code-tabs">
+        <button class="code-tab-btn active" data-target="panel-solver">
+          🎯 Solver (検証解) <span class="file-tag">main.cpp</span>
+        </button>
+        <button class="code-tab-btn" data-target="panel-naive">
+          🛡️ Naive (愚直解 / 正解) <span class="file-tag">naive.cpp</span>
+        </button>
+        <button class="code-tab-btn" data-target="panel-gen">
+          🎲 Generator (生成器) <span class="file-tag">gen.cpp / .py</span>
+        </button>
+      </div>
+
+      <!-- パネル 1: Solver -->
+      <div id="panel-solver" class="code-panel active">
+        <div class="panel-toolbar">
+          <span class="panel-hint">検証したい高速解法 (O(N) や O(N log N))</span>
+          <button id="btn-copy-solver" class="btn-text">コピー</button>
+        </div>
+        <textarea id="code-solver" class="code-editor" spellcheck="false" placeholder="// Solver (検証したい解法) のコード..."></textarea>
+      </div>
+
+      <!-- パネル 2: Naive -->
+      <div id="panel-naive" class="code-panel">
+        <div class="panel-toolbar">
+          <span class="panel-hint">確実に正解する愚直解法 (全探索・O(N²)・O(2ⁿ) など)</span>
+          <button id="btn-copy-naive" class="btn-text">コピー</button>
+        </div>
+        <textarea id="code-naive" class="code-editor" spellcheck="false" placeholder="// Naive (愚直解法) のコード..."></textarea>
+      </div>
+
+      <!-- パネル 3: Generator -->
+      <div id="panel-gen" class="code-panel">
+        <div class="panel-toolbar">
+          <span class="panel-hint">ランダムテストケースを stdout に出力するプログラム (C++ または Python)</span>
+          <button id="btn-copy-gen" class="btn-text">コピー</button>
+        </div>
+        <textarea id="code-gen" class="code-editor" spellcheck="false" placeholder="// Generator (C++ または Python) のコード..."></textarea>
+      </div>
+    </div>
+
+    <!-- 右ペイン: 失敗ケースインスペクタ -->
+    <div class="pane pane-inspector">
+      
+      <!-- 最小ケース通知バナー (見つかった場合) -->
+      <div id="minimal-case-banner" class="minimal-banner" style="display: none;">
+        <div class="minimal-header">
+          <span class="trophy-icon">🏆</span>
+          <span class="minimal-title">最小失敗ケースを特定！(デバッグ推奨)</span>
+          <button id="btn-load-minimal" class="btn btn-sm btn-cyan">このケースを検査</button>
+        </div>
+        <div class="minimal-meta" id="minimal-meta-text">入力サイズ: - 文字</div>
+      </div>
+
+      <!-- 失敗ケース一覧テーブル -->
+      <div class="failure-list-section">
+        <div class="failure-header">
+          <span>失敗ケース一覧 (<span id="failure-count">0</span>件):</span>
+          <div class="filter-group">
+            <button class="filter-btn active" data-filter="ALL">すべて</button>
+            <button class="filter-btn" data-filter="WA">WA</button>
+            <button class="filter-btn" data-filter="RE">RE</button>
+            <button class="filter-btn" data-filter="TLE">TLE</button>
+          </div>
+        </div>
+        
+        <div class="table-scroll-container">
+          <table class="failure-table">
+            <thead>
+              <tr>
+                <th width="70">Case #</th>
+                <th width="65">判定</th>
+                <th width="90">入力サイズ</th>
+                <th width="80">時間</th>
+                <th>概要</th>
+              </tr>
+            </thead>
+            <tbody id="failure-tbody">
+              <tr>
+                <td colspan="5" class="empty-cell">テスト未実行、または失敗ケースは検出されていません。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 選択されたケースの詳細プレビュー -->
+      <div class="failure-detail-section" id="failure-detail-section" style="display: none;">
+        <div class="detail-header">
+          <div class="detail-title-group">
+            <span class="detail-badge" id="detail-verdict-badge">WA</span>
+            <span class="detail-title" id="detail-case-title">ケース #14 の詳細</span>
+          </div>
+          <div class="detail-actions">
+            <button id="btn-transfer-cp-debug" class="btn btn-sm btn-danger btn-pulse" title="このケースを CP Debugger に転送してバグ行を特定します">
+              ⚡️ CP Debugger でバグ行特定
+            </button>
+          </div>
+        </div>
+
+        <div class="detail-grid">
+          <!-- 入力 -->
+          <div class="detail-box">
+            <div class="box-header">
+              <span>生成された入力 (stdin):</span>
+              <button id="btn-copy-fail-input" class="btn-text">コピー</button>
+            </div>
+            <pre id="detail-input-pre" class="detail-pre"></pre>
+          </div>
+
+          <!-- 正解 vs 実際 -->
+          <div class="detail-box">
+            <div class="box-header">
+              <span class="text-emerald">愚直解の出力 (Expected):</span>
+              <button id="btn-copy-fail-naive" class="btn-text">コピー</button>
+            </div>
+            <pre id="detail-naive-pre" class="detail-pre expected"></pre>
+          </div>
+
+          <div class="detail-box">
+            <div class="box-header">
+              <span class="text-rose">検証解の出力 (Actual):</span>
+              <button id="btn-copy-fail-solver" class="btn-text">コピー</button>
+            </div>
+            <pre id="detail-solver-pre" class="detail-pre actual"></pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

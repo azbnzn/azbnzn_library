@@ -38,6 +38,14 @@ APPLICATIONS = [
         "type": "python",
         "target": os.path.join(BASE_DIR, "cp_debugger", "server.py"),
     },
+    {
+        "id": "stress_tester",
+        "aliases": ["stress", "st", "tester", "pst"],
+        "name": "Parallel Stress Tester (並列ストレステスター)",
+        "description": "マルチコアCPU並列実行による超高速ストレステスト & 最小反例ケース探索",
+        "type": "python",
+        "target": os.path.join(BASE_DIR, "stress_tester", "server.py"),
+    },
 ]
 
 def launch_app(app):
