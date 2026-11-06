@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AtCoder CP Debugger - 競技プログラミング デバッガ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ヘッダー -->
+  <header>
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">⚡️</span>
+        <span class="logo-title">AtCoder CP Debugger</span>
+      </div>
+      <div class="tab-switcher">
+        <button id="tab-btn-debug" class="tab-btn active" title="単一ケースの実行とバグ行・原因特定">
+          🐞 単一ケース デバッガ
+        </button>
+        <button id="tab-btn-stress" class="tab-btn" title="Solver × Naive × Generator による自動検証">
+          ⚔️ ストレステスト
+        </button>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="badge badge-env">
+        Apple Clang C++17 (ASan / UBSan)
+      </span>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main id="app-container">
+    
+    <!-- ========================================== -->
+    <!-- TAB 1: 単一ケース デバッガ (Single Debugger) -->
+    <!-- ========================================== -->
+    <section id="view-debugger" class="app-view active">
+      <!-- ツールバー -->
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button id="btn-run-debug" class="btn btn-primary" title="コードをコンパイル・実行してバグ行と原因を特定します (Ctrl+Enter / Cmd+Enter)">
+            ▶ 実行 & バグ解析
+          </button>
+          <button id="btn-inject-ic" class="btn btn-secondary" title="icecream.hpp のインクルードとコンテキスト設定をコードに挿入します">
+            🍦 ic 挿入
+          </button>
+          <button id="btn-jump-error" class="btn btn-outline" style="display: none;" title="バグ発生行へスクロール">
+            🎯 バグ行へジャンプ
+          </button>
+        </div>
+
+        <div class="toolbar-group">
+          <label class="control-label">サンプル:</label>
+          <select id="select-sample-code" class="select-box">
+            <option value="">-- サンプルを選択 --</option>
+            <option value="sample_oob">配列外参照 (Buffer Overflow)</option>
+            <option value="sample_div0">0除算 (Division by Zero)</option>
+            <option value="sample_overflow">整数オーバーフロー (Integer Overflow)</option>
+            <option value="sample_loop">無限ループ (Infinite Loop TLE)</option>
+            <option value="sample_trace">トレース可視化 (icecream)</option>
+            <option value="sample_acl">ACL UnionFind</option>
+          </select>
+
+          <label class="control-label">ファイル:</label>
+          <button id="btn-load-file" class="btn btn-sm btn-outline">📂 開く</button>
+          <input type="file" id="file-input-cpp" accept=".cpp,.cc,.cxx,.hpp" style="display: none;">
+          <button id="btn-save-file" class="btn btn-sm btn-outline">💾 保存</button>
+        </div>
+
+        <div class="toolbar-group right-align">
+          <label class="control-label">制限時間:</label>
+          <select id="select-timeout" class="select-box sm">
+            <option value="1.0">1.0 秒</option>
+            <option value="2.0" selected>2.0 秒</option>
+            <option value="5.0">5.0 秒</option>
+          </select>
+
+          <label class="checkbox-label" title="AddressSanitizer & UndefinedBehaviorSanitizer を有効化して実行時エラーを捕捉します">
+            <input type="checkbox" id="check-sanitize" checked>
+            サニタイザ (ASan/UBSan)
+          </label>
+        </div>
+      </div>
+
+      <!-- デバッガ分割レイアウト -->
+      <div class="debugger-split">
+        <!-- 左ペイン: コードエディタ -->
+        <div class="pane pane-editor">
+          <div class="pane-header">
+            <span class="file-name">📄 main.cpp</span>
+            <div class="editor-meta">
+              <span id="editor-line-col">Line 1, Col 1</span>
+              <button id="btn-copy-code" class="btn-icon" title="コードをコピー">📋</button>
+            </div>
+          </div>
+          <div class="editor-container" id="editor-container">
+            <div class="gutter" id="editor-gutter"></div>
+            <div class="editor-highlight-overlay" id="editor-highlight-overlay"></div>
+            <textarea id="code-editor" class="code-textarea" spellcheck="false" placeholder="// ここに C++ コードを入力..."></textarea>
+          </div>
+        </div>
+
+        <!-- 右ペイン: インスペクタ & 出力 -->
+        <div class="pane pane-inspector">
+          <!-- インスペクタタブ -->
+          <div class="inspector-tabs">
+            <button class="insp-tab-btn active" data-tab="tab-testcase">📥 テストケース (入出力)</button>
+            <button class="insp-tab-btn" data-tab="tab-diagnosis">🩺 診断・バグ原因</button>
+            <button class="insp-tab-btn" data-tab="tab-diff">⚖️ 出力 Diff 比較</button>
+            <button class="insp-tab-btn" data-tab="tab-trace">📊 変数トレース (<span id="trace-badge-count">0</span>)</button>
+            <button class="insp-tab-btn" data-tab="tab-raw">📜 生ログ (stderr)</button>
+          </div>
+
+          <!-- タブ1: 入出力 (Testcase) -->
+          <div id="tab-testcase" class="insp-view active">
+            <div class="io-section">
+              <div class="io-header">
+                <span>標準入力 (stdin):</span>
+                <button id="btn-clear-input" class="btn-text">クリア</button>
+              </div>
+              <textarea id="input-stdin" class="io-textarea" placeholder="入力データを貼り付け..."></textarea>
+            </div>
+
+            <div class="io-section">
+              <div class="io-header">
+                <span>期待される出力 (Expected Output - 任意):</span>
+                <span class="io-subtext">※ 入力すると WA を自動検出し Diff 表示します</span>
+              </div>
+              <textarea id="input-expected" class="io-textarea" placeholder="正解出力を貼り付け (省略可能)..."></textarea>
+            </div>
+
+            <div class="io-section">
+              <div class="io-header">
+                <span>実際の出力 (stdout):</span>
+                <span id="exec-time-pill" class="pill-meta" style="display:none;">0 ms</span>
+              </div>
+              <pre id="output-stdout" class="io-output-box">実行結果がここに表示されます...</pre>
+            </div>
+          </div>
+
+          <!-- タブ2: 診断・バグ原因 (Diagnosis) -->
+          <div id="tab-diagnosis" class="insp-view">
+            <div class="verdict-banner" id="verdict-banner">
+              <div class="verdict-badge" id="verdict-badge">READY</div>
+              <div class="verdict-meta" id="verdict-meta">コードを実行すると診断結果が表示されます</div>
+            </div>
+
+            <!-- バグ行通知カード -->
+            <div id="bug-line-card" class="bug-card" style="display: none;">
+              <div class="bug-card-header">
+                <span class="bug-icon">⚠️</span>
+                <span class="bug-title" id="bug-line-text">バグ発生行: -</span>
+              </div>
+              <div class="bug-card-actions">
+                <button id="btn-jump-from-card" class="btn btn-sm btn-danger">エディタの該当行へ移動</button>
+              </div>
+            </div>
+
+            <!-- 詳細診断カード (人間可読な日本語解説) -->
+            <div id="diagnosis-explanation-card" class="diag-card" style="display: none;">
+              <h3 id="diag-title" class="diag-title">診断タイトル</h3>
+              <p id="diag-desc" class="diag-desc">原因の説明がここに表示されます。</p>
+              <div class="diag-advice-box" id="diag-advice-box">
+                <strong>💡 修正のアドバイス:</strong>
+                <p id="diag-advice">アドバイス内容</p>
+              </div>
+              <div class="diag-detail-box" id="diag-detail-box" style="display: none;">
+                <strong>詳細情報:</strong>
+                <pre id="diag-detail-pre"></pre>
+              </div>
+            </div>
+
+            <!-- 実行サマリー -->
+            <div class="summary-box" id="diagnosis-summary-box">
+              <div class="summary-row">
+                <span class="label">コンパイラ:</span>
+                <span class="value">Apple Clang (C++17, -O0, ASan/UBSan)</span>
+              </div>
+              <div class="summary-row">
+                <span class="label">ACL / 自作ライブラリ:</span>
+                <span class="value">インクルード可能 (<atcoder/all>, <mylib/...>)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- タブ3: 出力 Diff 比較 (Diff) -->
+          <div id="tab-diff" class="insp-view">
+            <div id="diff-status-box" class="diff-status-box">
+              期待される出力と実際の出力の差異を比較します。
+            </div>
+            <div id="diff-container" class="diff-container" style="display: none;">
+              <div class="diff-first-diff" id="diff-first-diff">
+                <!-- 最初の不一致トークン・行 -->
+              </div>
+              <div class="diff-split-view">
+                <div class="diff-pane">
+                  <div class="diff-pane-title">期待値 (Expected)</div>
+                  <pre id="diff-expected" class="diff-content"></pre>
+                </div>
+                <div class="diff-pane">
+                  <div class="diff-pane-title">実際 (Actual)</div>
+                  <pre id="diff-actual" class="diff-content"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- タブ4: トレース・タイムライン (Trace Timeline) -->
+          <div id="tab-trace" class="insp-view">
+            <div class="trace-toolbar">
+              <input type="text" id="trace-filter-input" class="search-input" placeholder="変数名でフィルタ (例: x, dp)...">
+              <span class="trace-stats" id="trace-stats">0 件のトレース</span>
+            </div>
+
+            <!-- トレース警告 (オーバーフロー/未初期化/NaN) -->
+            <div id="trace-warning-container" class="warning-container" style="display: none;"></div>
+
+            <!-- トレース一覧テーブル -->
+            <div class="trace-table-container">
+              <table class="trace-table">
+                <thead>
+                  <tr>
+                    <th width="45">Step</th>
+                    <th width="55">Line</th>
+                    <th width="110">スコープ</th>
+                    <th>変数と値 (クリックで行ジャンプ)</th>
+                  </tr>
+                </thead>
+                <tbody id="trace-table-body">
+                  <tr>
+                    <td colspan="4" class="empty-cell">
+                      icecream の <code>IC(x)</code> や <code>std::cerr</code> による出力がここに構造化表示されます。
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- タブ5: 生ログ (Raw Stderr) -->
+          <div id="tab-raw" class="insp-view">
+            <div class="raw-header">
+              <span>stderr (標準エラー出力):</span>
+              <button id="btn-copy-stderr" class="btn-text">コピー</button>
+            </div>
+            <pre id="output-stderr" class="raw-pre">stderr の生出力がここに表示されます...</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- TAB 2: ストレステスト (Stress Test Studio) -->
+    <!-- ========================================== -->
+    <section id="view-stress" class="app-view">
+      <!-- ツールバー -->
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button id="btn-start-stress" class="btn btn-emerald" title="Solver × Naive × Generator による連続自動テストを開始します">
+            ▶ ストレステスト開始
+          </button>
+          <button id="btn-stop-stress" class="btn btn-outline" disabled title="実行中のストレステストを中止">
+            ⏹ 中止
+          </button>
+          <button id="btn-load-stress-sample" class="btn btn-secondary">
+            📋 サンプル設定読込
+          </button>
+        </div>
+
+        <div class="toolbar-group right-align">
+          <label class="control-label">テストケース数:</label>
+          <select id="select-stress-iters" class="select-box sm">
+            <option value="30">30 回</option>
+            <option value="50" selected>50 回</option>
+            <option value="100">100 回</option>
+            <option value="300">300 回</option>
+          </select>
+
+          <label class="control-label">1ケース制限時間:</label>
+          <select id="select-stress-timeout" class="select-box sm">
+            <option value="1.0" selected>1.0 秒</option>
+            <option value="2.0">2.0 秒</option>
+          </select>
+
+          <label class="checkbox-label" title="不一致またはエラーが検出された時点で即座に停止します">
+            <input type="checkbox" id="check-stress-stop-fail" checked>
+            最初の失敗で停止
+          </label>
+        </div>
+      </div>
+
+      <!-- ストレステスト進行バー -->
+      <div class="stress-progress-bar-container">
+        <div id="stress-progress-bar" class="stress-progress-bar" style="width: 0%;"></div>
+      </div>
+      <div class="stress-status-line">
+        <span id="stress-status-text">待機中 (設定を確認して「ストレステスト開始」を押してください)</span>
+        <span id="stress-passed-count" class="pill-meta">0 / 0 完了</span>
+      </div>
+
+      <!-- 失敗検出カード (失敗時に表示) -->
+      <div id="stress-fail-card" class="stress-fail-card" style="display: none;">
+        <div class="fail-card-header">
+          <div class="fail-title">
+            <span class="fail-icon">🚨</span>
+            <span id="stress-fail-title">ケース #14 で不一致 (WA) を検出！</span>
+          </div>
+          <button id="btn-transfer-to-debug" class="btn btn-danger btn-pulse" title="この失敗ケースの入力と期待出力を単一デバッガへ転送し、即座にバグ行を特定します">
+            ⚡️ このケースをデバッガで開いて診断
+          </button>
+        </div>
+        <div class="fail-content-grid">
+          <div class="fail-grid-col">
+            <div class="fail-label">生成されたテスト入力 (stdin):</div>
+            <pre id="stress-fail-input" class="fail-pre"></pre>
+          </div>
+          <div class="fail-grid-col">
+            <div class="fail-label">愚直解の出力 (Naive / 正解):</div>
+            <pre id="stress-fail-naive" class="fail-pre expected"></pre>
+          </div>
+          <div class="fail-grid-col">
+            <div class="fail-label">検証解の出力 (Solver / バグ):</div>
+            <pre id="stress-fail-solver" class="fail-pre actual"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3コード入力エディタ (タブ / 3分割) -->
+      <div class="stress-code-grid">
+        <!-- 1. Solver -->
+        <div class="stress-code-pane">
+          <div class="pane-header">
+            <span class="file-name">🎯 Solver (検証対象の解法)</span>
+            <button id="btn-sync-from-debugger" class="btn-sm btn-outline" title="デバッガ画面のコードを反映">デバッガから取込</button>
+          </div>
+          <textarea id="stress-code-solver" class="code-textarea stress-ta" spellcheck="false" placeholder="// 検証したいコード..."></textarea>
+        </div>
+
+        <!-- 2. Naive -->
+        <div class="stress-code-pane">
+          <div class="pane-header">
+            <span class="file-name">🛡️ Naive (正解が保証された愚直解法)</span>
+            <span class="pane-hint">O(N²) や O(2ⁿ) でOK</span>
+          </div>
+          <textarea id="stress-code-naive" class="code-textarea stress-ta" spellcheck="false" placeholder="// 愚直解法 (全探索など)..."></textarea>
+        </div>
+
+        <!-- 3. Generator -->
+        <div class="stress-code-pane">
+          <div class="pane-header">
+            <span class="file-name">🎲 Generator (ランダムテスト生成器)</span>
+            <span class="pane-hint">std::mt19937 等</span>
+          </div>
+          <textarea id="stress-code-gen" class="code-textarea stress-ta" spellcheck="false" placeholder="// ランダム入力を stdout に出力するプログラム..."></textarea>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grid Visualizer - 競プロ用グリッド考察ボード</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">▦</div>
+      <div>
+        <h1>Grid Visualizer</h1>
+        <div class="subtitle">競プロ用グリッド考察・巡回塗り分け・シミュレータ</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-primary" id="btn-open-reader" title="AtCoderなどの入力を貼り付け・ファイルから読み込む">📥 テキスト・ファイル読込</button>
+      <button class="btn btn-secondary" id="btn-export-text" title="現在の盤面をテキストとしてコピー">📋 盤面コピー</button>
+      <button class="btn btn-secondary" id="btn-copy-cpp" title="C++ vector&lt;string&gt; コードとしてコピー">💻 C++コード生成</button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <div class="app-container">
+
+    <!-- サイドバー (操作パネル) -->
+    <aside class="sidebar">
+
+      <!-- 1. グリッドサイズ設定 -->
+      <div class="control-section">
+        <div class="section-title">
+          <span>グリッドサイズ</span>
+        </div>
+        <div class="size-inputs">
+          <div class="input-group">
+            <label for="input-h">H:</label>
+            <input type="number" id="input-h" class="number-input" value="5" min="1" max="50">
+          </div>
+          <div class="input-group">
+            <label for="input-w">W:</label>
+            <input type="number" id="input-w" class="number-input" value="5" min="1" max="50">
+          </div>
+          <button id="btn-resize" class="btn btn-primary">生成</button>
+        </div>
+        <div style="display: flex; gap: 6px; margin-top: 4px;">
+          <button id="btn-add-row" class="btn btn-secondary" style="flex:1; padding: 4px;">+行</button>
+          <button id="btn-del-row" class="btn btn-secondary" style="flex:1; padding: 4px;">-行</button>
+          <button id="btn-add-col" class="btn btn-secondary" style="flex:1; padding: 4px;">+列</button>
+          <button id="btn-del-col" class="btn btn-secondary" style="flex:1; padding: 4px;">-列</button>
+        </div>
+      </div>
+
+      <!-- 2. カラーサイクル設定 (色数の指定 & 巡回順序) -->
+      <div class="control-section">
+        <div class="section-title">
+          <span>色巡回 (カラーサイクル)</span>
+        </div>
+        <div class="cycle-config-box">
+          <div class="cycle-count-row">
+            <span style="font-size: 0.9rem; font-weight: 600;">塗り分け色数:</span>
+            <div class="stepper">
+              <button id="btn-cycle-minus" class="stepper-btn" title="色数を減らす">−</button>
+              <span id="cycle-count-display" class="stepper-value">2</span>
+              <button id="btn-cycle-plus" class="stepper-btn" title="色数を増やす">＋</button>
+            </div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-sub);">
+            マスを押すと以下の順に色が切り替わります：
+          </div>
+          <!-- 循環プレビュー (白 -> 黒 -> 赤 -> ...) -->
+          <div id="cycle-preview-list" class="cycle-preview-list"></div>
+          <div style="font-size: 0.7rem; color: var(--text-sub);">
+            ※ 各色をクリックすると別の色に変更もできます
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 操作ツールモード -->
+      <div class="control-section">
+        <div class="section-title">
+          <span>ツールモード</span>
+        </div>
+        <div class="tool-modes">
+          <button class="tool-btn active" data-mode="cycle" title="クリックするたびに色を巡回 (白→黒→赤...)。ドラッグで同じ色を連続塗り">
+            <span class="icon">🔄</span>
+            <span>色巡回 (クリック塗り)</span>
+          </button>
+          <button class="tool-btn" data-mode="bucket" title="クリックした連結領域を一気に塗りつぶす">
+            <span class="icon">🪣</span>
+            <span>塗りつぶし</span>
+          </button>
+          <button class="tool-btn" data-mode="eraser" title="色と文字を白紙に戻す">
+            <span class="icon">🧹</span>
+            <span>消しゴム</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 4. クイックスタンプ -->
+      <div class="control-section">
+        <div class="section-title">
+          <span>スタンプ (選択マスに配置)</span>
+        </div>
+        <div class="stamp-buttons">
+          <button class="stamp-btn" data-text="S" data-color="#10b981">Start (S)</button>
+          <button class="stamp-btn" data-text="G" data-color="#ef4444">Goal (G)</button>
+          <button class="stamp-btn" data-text="#" data-color="#1e293b">壁 (#)</button>
+          <button class="stamp-btn" data-text="." data-color="#ffffff">道 (.)</button>
+          <button class="stamp-btn" data-text="0">0</button>
+          <button class="stamp-btn" data-text="1">1</button>
+          <button class="stamp-btn" data-text="INF">INF</button>
+          <button class="stamp-btn" data-text="-1">-1</button>
+        </div>
+      </div>
+
+      <!-- 5. 全体クリア -->
+      <div class="control-section">
+        <div class="section-title">
+          <span>クリア</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-clear-colors" class="btn btn-secondary" style="flex:1;">色のみクリア</button>
+          <button id="btn-clear-texts" class="btn btn-secondary" style="flex:1;">文字のみクリア</button>
+        </div>
+      </div>
+
+      <!-- 操作ヒント -->
+      <div style="margin-top: auto; font-size: 0.75rem; color: var(--text-sub); line-height: 1.5; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid var(--panel-border);">
+        <b>💡 かんたん操作ガイド:</b><br>
+        ・<b>左クリック</b>: 色が順番に切り替わる（デフォルト: 白⇄黒、色数を増やすと赤なども巡回）<br>
+        ・<b>ドラッグ</b>: 直前に出た色で連続塗り<br>
+        ・<b>右クリック</b>: 色を逆戻し（黒→白）<br>
+        ・<b>キーボードで数字入力</b>: マスを選択してそのまま数字（0〜9等）をタイプ可能<br>
+        ・<b>矢印キー</b>: マス移動 / <b>Backspace</b>: 文字消去<br>
+        ・<b>Ctrl+Z / Cmd+Z</b>: 元に戻す (Undo)
+      </div>
+
+    </aside>
+
+    <!-- ワークスペース (グリッド領域) -->
+    <main class="workspace">
+
+      <!-- ツールバー -->
+      <div class="workspace-toolbar">
+        <div class="toolbar-group">
+          <button id="btn-undo" class="btn btn-secondary" title="元に戻す (Ctrl+Z)">↩ 元に戻す</button>
+          <button id="btn-redo" class="btn btn-secondary" title="やり直す (Ctrl+Y)">↪ やり直す</button>
+        </div>
+
+        <div class="toolbar-group">
+          <span style="font-size: 0.85rem; color: var(--text-sub); margin-right: 4px;">インデックス:</span>
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="toggle-index-0">0-indexed</button>
+            <button class="toggle-btn" id="toggle-index-1">1-indexed</button>
+          </div>
+        </div>
+
+        <div class="toolbar-group" style="width: 180px;">
+          <span style="font-size: 0.85rem; color: var(--text-sub); white-space: nowrap;">サイズ:</span>
+          <input type="range" id="cell-size-slider" min="28" max="72" value="48" style="flex: 1;">
+        </div>
+      </div>
+
+      <!-- グリッドスクロールコンテナ -->
+      <div class="grid-scroll-container">
+        <div class="grid-wrapper">
+          <table id="grid-table" class="grid-table"></table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- テキスト / ファイル読み込みモーダル -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>📥 テキスト / ファイル読み込み</span>
+        </div>
+        <button class="modal-close" id="modal-close-btn">&times;</button>
+      </div>
+
+      <!-- モード切り替えタブ -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-mode-string" data-reader-mode="string">
+          <span>🔤 文字列モード</span>
+        </button>
+        <button class="mode-tab" id="tab-mode-number" data-reader-mode="number">
+          <span>🔢 数字モード</span>
+        </button>
+      </div>
+
+      <!-- モード説明 -->
+      <div class="mode-desc" id="mode-desc-text">
+        <b>【文字列モード形式】</b><br>
+        1行目に <code>H W</code>、続く $H$ 行に各行 $W$ 文字の文字列。<br>
+        <b>文字が <code>#</code> のマスのみ黒色（壁）</b> で表示します。
+      </div>
+
+      <!-- ファイル読み込みゾーン (ドラッグ＆ドロップ対応) -->
+      <div class="file-drop-zone" id="file-drop-zone">
+        <span style="font-size: 1.3rem;">📄</span>
+        <span>ファイルをここにドロップ または <u>ファイルを選択</u></span>
+        <input type="file" id="file-input" accept=".txt,.in,.out,text/*" style="display: none;">
+      </div>
+
+      <!-- テキストエリア -->
+      <textarea id="modal-textarea" class="modal-textarea" placeholder="ここにテキストを貼り付けてください..."></textarea>
+
+      <!-- サンプル投入ボタン & アクション -->
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button class="btn btn-secondary" id="btn-insert-sample" style="font-size: 0.75rem; padding: 4px 8px;">サンプル入力を試す</button>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="btn-modal-cancel">キャンセル</button>
+          <button class="btn btn-primary" id="modal-confirm-btn">グリッドに反映</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div class="toast" id="toast">クリップボードにコピーしました！</div>
+
+  <script src="script.js"></script>
+</body>
+</html>

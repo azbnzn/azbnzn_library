@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Array Graph - 競プロ用 配列・数列グラフプロッター</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ヘッダー -->
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">📈</div>
+      <div>
+        <h1>Array Graph</h1>
+        <div class="subtitle">競プロ用 配列・数列プロッター（非負時はボトム y=0 対応）</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary" id="btn-export-text" title="配列データをテキスト形式でコピー">📋 テキストコピー</button>
+      <button class="btn btn-secondary" id="btn-export-cpp" title="C++ vector<long long> コードとしてコピー">💻 C++コード</button>
+      <button class="btn btn-primary" id="btn-save-image" title="グラフを画像 (PNG) として保存">🖼️ 画像保存</button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <div class="app-container">
+
+    <!-- サイドバー (入力・設定・統計) -->
+    <aside class="sidebar">
+
+      <!-- 1. 入力セクション -->
+      <div class="control-section">
+        <div class="section-title">
+          <span>📥 配列データ入力</span>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-sub); margin-bottom: 6px; line-height: 1.4;">
+          1行目に $N$、2行目に空白区切りの $A_1 \dots A_N$。<br>
+          ※ $N$ 省略や改行区切りの数列も自動判別します。
+        </div>
+
+        <textarea id="input-array-text" class="input-textarea" placeholder="5&#10;3 1 4 1 5"></textarea>
+
+        <!-- ファイルドロップゾーン -->
+        <div class="file-drop-zone" id="file-drop-zone">
+          <span>📄 ファイルをドロップ または <u>選択</u></span>
+          <input type="file" id="file-input" accept=".txt,.in,.out,text/*" style="display: none;">
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <button id="btn-plot" class="btn btn-primary" style="flex: 1; padding: 10px;">📊 グラフを描画</button>
+          <button id="btn-clear" class="btn btn-secondary" style="padding: 10px 14px;">クリア</button>
+        </div>
+
+        <!-- プリセットサンプル -->
+        <div style="margin-top: 10px;">
+          <div style="font-size: 0.75rem; color: var(--text-sub); margin-bottom: 4px;">プリセットサンプル:</div>
+          <div class="preset-buttons">
+            <button class="preset-btn" data-preset="nonneg">非負数列 (典型)</button>
+            <button class="preset-btn" data-preset="negative">負数含む (株価DP)</button>
+            <button class="preset-btn" data-preset="convex">下凸 (三分探索)</button>
+            <button class="preset-btn" data-preset="random-walk">ランダムウォーク</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. グラフ表示設定 -->
+      <div class="control-section">
+        <div class="section-title">
+          <span>⚙️ グラフ表示設定</span>
+        </div>
+
+        <!-- グラフ種別 -->
+        <div class="setting-row">
+          <label class="setting-label">形式:</label>
+          <div class="toggle-group" id="graph-type-group">
+            <button class="toggle-btn" data-type="line">折れ線</button>
+            <button class="toggle-btn" data-type="bar">棒</button>
+            <button class="toggle-btn active" data-type="scatter">点</button>
+            <button class="toggle-btn" data-type="step">階段</button>
+          </div>
+        </div>
+
+        <!-- インデックス -->
+        <div class="setting-row">
+          <label class="setting-label">X軸:</label>
+          <div class="toggle-group" id="index-type-group">
+            <button class="toggle-btn active" data-index="1">1-indexed (i=1..N)</button>
+            <button class="toggle-btn" data-index="0">0-indexed (i=0..N-1)</button>
+          </div>
+        </div>
+
+        <!-- Y軸下限設定 -->
+        <div class="setting-row">
+          <label class="setting-label">Y軸下限:</label>
+          <select id="select-y-mode" class="select-input">
+            <option value="auto_zero" selected>非負時はボトム y=0 (仕様準拠)</option>
+            <option value="always_zero">常に y=0 を含む</option>
+            <option value="tight">min〜max 完全フィット</option>
+          </select>
+        </div>
+
+        <!-- 縦横の縮尺 (アスペクト比) -->
+        <div class="setting-row">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label class="setting-label">縦横比 (縮尺):</label>
+            <span id="aspect-ratio-val" style="font-size: 0.76rem; font-family: var(--font-mono); color: var(--accent-cyan); font-weight: bold;">1:1 (等倍)</span>
+          </div>
+          <div class="toggle-group" id="aspect-ratio-group">
+            <button class="toggle-btn active" data-aspect="1:1" title="X軸とY軸の1目盛りピクセル長を同一にする (デフォルト等倍)">1:1 (等倍)</button>
+            <button class="toggle-btn" data-aspect="auto" title="キャンバス全体に広がるよう自動フィット">自動フィット</button>
+            <button class="toggle-btn" data-aspect="custom" title="スライダーで自由な縦横比率に調整">カスタム</button>
+          </div>
+          <div id="aspect-slider-container" style="display: none; flex-direction: column; gap: 4px; margin-top: 4px; background: #0f172a; padding: 8px; border-radius: 6px; border: 1px solid var(--panel-border);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-sub);">
+              <span>Y軸 0.2x</span>
+              <span id="slider-ratio-display" style="color: var(--accent-cyan); font-weight: bold;">1.0x (1:1)</span>
+              <span>Y軸 5.0x</span>
+            </div>
+            <input type="range" id="aspect-ratio-slider" min="0.2" max="5.0" step="0.05" value="1.0" style="width: 100%; accent-color: var(--accent);">
+            <div style="display: flex; justify-content: space-between; gap: 4px; margin-top: 4px;">
+              <button class="preset-btn" style="flex: 1;" id="btn-aspect-05">0.5x (1:2)</button>
+              <button class="preset-btn" style="flex: 1;" id="btn-aspect-10">1.0x (1:1)</button>
+              <button class="preset-btn" style="flex: 1;" id="btn-aspect-20">2.0x (2:1)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- チェックボックスオプション -->
+        <div class="checkbox-options">
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-show-labels" checked>
+            <span>データラベル（各点の数値を表示）</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-show-grid" checked>
+            <span>グリッド線を表示</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-show-prefix">
+            <span>累積和 (Prefix Sum) を重ねて表示</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-show-zero" checked>
+            <span>y=0 の基準線を強調</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 3. 配列統計情報 (Analytics) -->
+      <div class="control-section">
+        <div class="section-title">
+          <span>📊 配列の基本統計</span>
+        </div>
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-item">
+            <div class="stat-name">要素数 N</div>
+            <div class="stat-val" id="stat-n">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-name">最小値 min(A)</div>
+            <div class="stat-val" id="stat-min">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-name">最大値 max(A)</div>
+            <div class="stat-val" id="stat-max">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-name">総和 ΣA</div>
+            <div class="stat-val" id="stat-sum">-</div>
+          </div>
+          <div class="stat-item" style="grid-column: span 2;">
+            <div class="stat-name">平均値</div>
+            <div class="stat-val" id="stat-avg">-</div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- メインワークスペース (キャンバス) -->
+    <main class="workspace">
+
+      <!-- ツールバー -->
+      <div class="workspace-toolbar">
+        <div class="toolbar-group">
+          <button id="btn-zoom-in" class="btn btn-secondary" title="拡大">🔍 拡大</button>
+          <button id="btn-zoom-out" class="btn btn-secondary" title="縮小">🔍 縮小</button>
+          <button id="btn-reset-view" class="btn btn-secondary" title="全体を表示 (リセット)">🔄 全体表示</button>
+        </div>
+
+        <div class="toolbar-status" id="hover-coord-text">
+          座標: マウスをホバーすると値を表示します
+        </div>
+      </div>
+
+      <!-- キャンバスエリア -->
+      <div class="canvas-container" id="canvas-container">
+        <canvas id="plot-canvas"></canvas>
+
+        <!-- マウスホバー用フローティングツールチップ -->
+        <div class="plot-tooltip" id="plot-tooltip"></div>
+
+        <!-- データ未入力時のプレースホルダー -->
+        <div class="empty-state" id="empty-state">
+          <div style="font-size: 3rem; margin-bottom: 12px;">📊</div>
+          <h3>配列データを入力してプロット</h3>
+          <p>左側の入力欄に $N$ と $A_1 \dots A_N$ を貼り付けて「グラフを描画」を押してください。<br>プリセットサンプルからもすぐに試せます。</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- トースト通知 -->
+  <div class="toast" id="toast">クリップボードにコピーしました！</div>
+
+  <script src="script.js"></script>
+</body>
+</html>
