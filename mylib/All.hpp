@@ -9,6 +9,7 @@
 #include "DynamicStringTreap.hpp"
 #include "EulerTour.hpp"
 #include "Geometry.hpp"
+#include "IntervalSet.hpp"
 #include "LazySqrtDecomposition.hpp"
 #include "LinearDiophantine.hpp"
 #include "LowestCommonAncestor.hpp"
