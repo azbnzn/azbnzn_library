@@ -443,6 +443,15 @@ header {
   overflow: hidden;
 }
 
+.main-split.codes-collapsed .pane-codes {
+  display: none !important;
+}
+
+.main-split.codes-collapsed .pane-inspector {
+  flex: 1 1 100% !important;
+  max-width: 100% !important;
+}
+
 .pane {
   display: flex;
   flex-direction: column;

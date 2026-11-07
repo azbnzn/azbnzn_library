@@ -50,6 +50,27 @@ header {
   gap: 12px;
 }
 
+.sidebar-header-toggle-btn {
+  background: #0f172a;
+  border: 1px solid var(--panel-border);
+  color: var(--text-main);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sidebar-header-toggle-btn:hover {
+  background: #334155;
+  border-color: var(--accent);
+  color: #bfdbfe;
+}
+
 .logo-icon {
   font-size: 1.6rem;
   background-color: #1e293b;
@@ -79,11 +100,13 @@ h1 {
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
 /* サイドバー */
 .sidebar {
   width: 340px;
+  min-width: 340px;
   background-color: var(--bg-sidebar);
   border-right: 1px solid var(--panel-border);
   padding: 16px;
@@ -91,6 +114,108 @@ h1 {
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease,
+              border-width 0.25s ease;
+  white-space: normal;
+}
+
+.app-container.sidebar-collapsed .sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border-right: none !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* サイドバー上部ヘッダー */
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.sidebar-header-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
+}
+
+.sidebar-close-btn {
+  background: #0f172a;
+  border: 1px solid var(--panel-border);
+  color: var(--text-sub);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.sidebar-close-btn:hover {
+  background: #334155;
+  color: var(--text-main);
+  border-color: var(--accent);
+}
+
+/* ツールバーのサイドバートグルボタン */
+.sidebar-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.825rem;
+}
+
+.sidebar-toggle-btn.active {
+  background-color: #1e3a8a;
+  border-color: var(--accent);
+  color: #bfdbfe;
+}
+
+/* フローティング展開ボタン (折りたたみ時に左端に現れるタブ) */
+.floating-sidebar-toggle {
+  position: absolute;
+  top: 55px;
+  left: 0;
+  z-index: 40;
+  background: #1e293b;
+  border: 1px solid var(--panel-border);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  color: var(--text-main);
+  padding: 8px 12px 8px 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 2px 4px 12px rgba(0, 0, 0, 0.4);
+  transition: all 0.15s ease;
+}
+
+.floating-sidebar-toggle:hover {
+  background: #334155;
+  color: #bfdbfe;
+  border-color: var(--accent);
+  padding-left: 12px;
+}
+
+.app-container.sidebar-collapsed .floating-sidebar-toggle {
+  display: inline-flex;
 }
 
 .control-section {

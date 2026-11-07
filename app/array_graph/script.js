@@ -37,9 +37,26 @@ class ArrayGraphVisualizer {
 
     // デフォルトで非負数列サンプルをプロット
     this.loadPreset("nonneg");
+
+    // 保存されていたサイドバー状態の復元
+    try {
+      const savedCollapsed = localStorage.getItem("array_graph_sidebar_collapsed") === "true";
+      if (savedCollapsed) {
+        this.setSidebarCollapsed(true, false);
+      }
+    } catch (err) {}
   }
 
   initDOM() {
+    // サイドバー開閉関連
+    this.appContainer = document.getElementById("app-container");
+    this.btnHeaderToggleSidebar = document.getElementById("btn-header-toggle-sidebar");
+    this.btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
+    this.btnCloseSidebar = document.getElementById("btn-close-sidebar");
+    this.btnFloatingExpand = document.getElementById("btn-floating-expand");
+    this.sidebarToggleIcon = document.getElementById("sidebar-toggle-icon");
+    this.sidebarToggleText = document.getElementById("sidebar-toggle-text");
+
     this.canvas = document.getElementById("plot-canvas");
     this.ctx = this.canvas.getContext("2d");
     this.container = document.getElementById("canvas-container");
@@ -86,6 +103,28 @@ class ArrayGraphVisualizer {
   }
 
   initEvents() {
+    // サイドバー開閉イベント
+    if (this.btnHeaderToggleSidebar) {
+      this.btnHeaderToggleSidebar.addEventListener("click", () => this.toggleSidebar());
+    }
+    if (this.btnToggleSidebar) {
+      this.btnToggleSidebar.addEventListener("click", () => this.toggleSidebar());
+    }
+    if (this.btnCloseSidebar) {
+      this.btnCloseSidebar.addEventListener("click", () => this.setSidebarCollapsed(true));
+    }
+    if (this.btnFloatingExpand) {
+      this.btnFloatingExpand.addEventListener("click", () => this.setSidebarCollapsed(false));
+    }
+
+    // キーボードショートカット: Ctrl+B / Cmd+B でサイドバー開閉
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        this.toggleSidebar();
+      }
+    });
+
     window.addEventListener("resize", () => {
       this.resizeCanvas();
       if (this.aspectRatioMode !== "auto") {
@@ -1134,6 +1173,46 @@ class ArrayGraphVisualizer {
     link.href = this.canvas.toDataURL("image/png");
     link.click();
     this.showToast("グラフ画像を保存しました！");
+  }
+
+  toggleSidebar() {
+    if (!this.appContainer) return;
+    const isCollapsed = this.appContainer.classList.contains("sidebar-collapsed");
+    this.setSidebarCollapsed(!isCollapsed);
+  }
+
+  setSidebarCollapsed(collapsed, animate = true) {
+    if (!this.appContainer) return;
+    if (collapsed) {
+      this.appContainer.classList.add("sidebar-collapsed");
+      if (this.sidebarToggleIcon) this.sidebarToggleIcon.textContent = "▶";
+      if (this.sidebarToggleText) this.sidebarToggleText.textContent = "パネルを表示";
+      if (this.btnToggleSidebar) this.btnToggleSidebar.classList.add("active");
+      if (this.btnHeaderToggleSidebar) this.btnHeaderToggleSidebar.classList.add("active");
+    } else {
+      this.appContainer.classList.remove("sidebar-collapsed");
+      if (this.sidebarToggleIcon) this.sidebarToggleIcon.textContent = "◀";
+      if (this.sidebarToggleText) this.sidebarToggleText.textContent = "パネルを隠す";
+      if (this.btnToggleSidebar) this.btnToggleSidebar.classList.remove("active");
+      if (this.btnHeaderToggleSidebar) this.btnHeaderToggleSidebar.classList.remove("active");
+    }
+    try {
+      localStorage.setItem("array_graph_sidebar_collapsed", collapsed ? "true" : "false");
+    } catch (err) {}
+
+    // アニメーション完了後にキャンバスをリサイズして再描画
+    if (animate) {
+      setTimeout(() => {
+        this.resizeCanvas();
+        if (this.aspectRatioMode !== "auto") {
+          this.resetView();
+        }
+        this.render();
+      }, 260);
+    } else {
+      this.resizeCanvas();
+      this.render();
+    }
   }
 
   showToast(message) {

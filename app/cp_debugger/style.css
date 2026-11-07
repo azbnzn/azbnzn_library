@@ -361,6 +361,15 @@ header {
   flex-direction: column;
 }
 
+.debugger-split.inspector-collapsed .pane-inspector {
+  display: none !important;
+}
+
+.debugger-split.inspector-collapsed .pane-editor {
+  flex: 1 1 100% !important;
+  border-right: none !important;
+}
+
 .pane-header {
   background-color: var(--panel-header);
   border-bottom: 1px solid var(--panel-border);

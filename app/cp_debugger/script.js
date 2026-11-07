@@ -25,6 +25,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectSampleCode = document.getElementById("select-sample-code");
   const selectTimeout = document.getElementById("select-timeout");
   const checkSanitize = document.getElementById("check-sanitize");
+  const btnToggleInspector = document.getElementById("btn-toggle-inspector");
+  const debuggerSplit = document.querySelector(".debugger-split");
 
   // DOM Elements - Inspector Tabs
   const inspTabBtns = document.querySelectorAll(".insp-tab-btn");
@@ -307,6 +309,21 @@ int main() {
   codeEditor.addEventListener("input", () => {
     updateGutter();
     updateCursorPos();
+    try {
+      localStorage.setItem("cpd_draft_code", codeEditor.value);
+    } catch (e) {}
+  });
+
+  inputStdin.addEventListener("input", () => {
+    try {
+      localStorage.setItem("cpd_draft_input", inputStdin.value);
+    } catch (e) {}
+  });
+
+  inputExpected.addEventListener("input", () => {
+    try {
+      localStorage.setItem("cpd_draft_expected", inputExpected.value);
+    } catch (e) {}
   });
 
   codeEditor.addEventListener("scroll", syncScroll);
@@ -456,7 +473,41 @@ int main() {
   function switchInspectorTab(targetId) {
     inspTabBtns.forEach((b) => b.classList.toggle("active", b.getAttribute("data-tab") === targetId));
     inspViews.forEach((v) => v.classList.toggle("active", v.id === targetId));
+    try {
+      localStorage.setItem("cpd_active_tab", targetId);
+    } catch (e) {}
   }
+
+  // ==========================================================================
+  // Inspector Collapse / Expand Toggle
+  // ==========================================================================
+  function setInspectorCollapsed(collapsed) {
+    if (!debuggerSplit) return;
+    debuggerSplit.classList.toggle("inspector-collapsed", collapsed);
+    if (btnToggleInspector) {
+      btnToggleInspector.classList.toggle("active", collapsed);
+      btnToggleInspector.textContent = collapsed ? "◧ インスペクタ表示" : "◧ インスペクタ隠す";
+    }
+    try {
+      localStorage.setItem("cpd_inspector_collapsed", collapsed ? "true" : "false");
+    } catch (e) {}
+  }
+
+  function toggleInspector() {
+    if (!debuggerSplit) return;
+    setInspectorCollapsed(!debuggerSplit.classList.contains("inspector-collapsed"));
+  }
+
+  if (btnToggleInspector) {
+    btnToggleInspector.addEventListener("click", toggleInspector);
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+      e.preventDefault();
+      toggleInspector();
+    }
+  });
 
   // ==========================================================================
   // Debug Execution & Diagnosis
@@ -893,6 +944,31 @@ int main() {
   inputStdin.value = "3\n10 20 30\n";
   inputExpected.value = "60\n";
 
+  // Restore drafts from localStorage if available
+  try {
+    const savedCode = localStorage.getItem("cpd_draft_code");
+    if (savedCode !== null && savedCode !== undefined) {
+      codeEditor.value = savedCode;
+    }
+    const savedIn = localStorage.getItem("cpd_draft_input");
+    if (savedIn !== null && savedIn !== undefined) {
+      inputStdin.value = savedIn;
+    }
+    const savedExp = localStorage.getItem("cpd_draft_expected");
+    if (savedExp !== null && savedExp !== undefined) {
+      inputExpected.value = savedExp;
+    }
+
+    if (localStorage.getItem("cpd_inspector_collapsed") === "true") {
+      setInspectorCollapsed(true);
+    }
+
+    const savedTab = localStorage.getItem("cpd_active_tab");
+    if (savedTab) {
+      switchInspectorTab(savedTab);
+    }
+  } catch (e) {}
+
   // Initialize Stress Test with sample
   stressCodeSolver.value = STRESS_SAMPLE.solver;
   stressCodeNaive.value = STRESS_SAMPLE.naive;
@@ -913,6 +989,8 @@ int main() {
       localStorage.removeItem("cpd_transfer_code");
       localStorage.removeItem("cpd_transfer_input");
       localStorage.removeItem("cpd_transfer_expected");
+      // If code was transferred for inspection, ensure inspector is visible
+      setInspectorCollapsed(false);
       updateGutter();
       updateCursorPos();
       setTimeout(runDebug, 200);

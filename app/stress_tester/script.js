@@ -19,6 +19,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectTimeout = document.getElementById("select-timeout");
   const checkSanitizeSolver = document.getElementById("check-sanitize-solver");
   const selectPreset = document.getElementById("select-preset");
+  const btnToggleCodes = document.getElementById("btn-toggle-codes");
+  const mainSplit = document.querySelector(".main-split");
 
   // DOM Elements - Dashboard Metrics
   const metricSpeed = document.getElementById("metric-speed");
@@ -229,13 +231,65 @@ int main() {
     labelWorkers.textContent = `${inputWorkersRange.value} コア`;
   });
 
-  // 2. Editor Tabs
+  // 2. Editor Tabs & Persistence
+  function switchCodeTab(targetId) {
+    codeTabBtns.forEach(b => b.classList.toggle("active", b.getAttribute("data-target") === targetId));
+    codePanels.forEach(p => p.classList.toggle("active", p.id === targetId));
+    try {
+      localStorage.setItem("pst_active_code_tab", targetId);
+    } catch (e) {}
+  }
+
   codeTabBtns.forEach(btn => {
     btn.addEventListener("click", () => {
       const targetId = btn.getAttribute("data-target");
-      codeTabBtns.forEach(b => b.classList.toggle("active", b === btn));
-      codePanels.forEach(p => p.classList.toggle("active", p.id === targetId));
+      switchCodeTab(targetId);
     });
+  });
+
+  // Collapse / Expand Code Editor Pane
+  function setCodesCollapsed(collapsed) {
+    if (!mainSplit) return;
+    mainSplit.classList.toggle("codes-collapsed", collapsed);
+    if (btnToggleCodes) {
+      btnToggleCodes.classList.toggle("active", collapsed);
+      btnToggleCodes.textContent = collapsed ? "◧ エディタ表示" : "◧ エディタ隠す";
+    }
+    try {
+      localStorage.setItem("pst_codes_collapsed", collapsed ? "true" : "false");
+    } catch (e) {}
+  }
+
+  function toggleCodes() {
+    if (!mainSplit) return;
+    setCodesCollapsed(!mainSplit.classList.contains("codes-collapsed"));
+  }
+
+  if (btnToggleCodes) {
+    btnToggleCodes.addEventListener("click", toggleCodes);
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+      e.preventDefault();
+      toggleCodes();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      if (!isRunning) {
+        e.preventDefault();
+        btnStart.click();
+      }
+    }
+  });
+
+  // Draft code auto-save
+  codeSolver.addEventListener("input", () => {
+    try { localStorage.setItem("pst_draft_solver", codeSolver.value); } catch (e) {}
+  });
+  codeNaive.addEventListener("input", () => {
+    try { localStorage.setItem("pst_draft_naive", codeNaive.value); } catch (e) {}
+  });
+  codeGen.addEventListener("input", () => {
+    try { localStorage.setItem("pst_draft_gen", codeGen.value); } catch (e) {}
   });
 
   // Copy code buttons
@@ -572,4 +626,23 @@ int main() {
   codeSolver.value = def.solver;
   codeNaive.value = def.naive;
   codeGen.value = def.gen;
+
+  // Restore drafts and panel state from localStorage
+  try {
+    const savedSolver = localStorage.getItem("pst_draft_solver");
+    if (savedSolver !== null && savedSolver !== undefined) codeSolver.value = savedSolver;
+    const savedNaive = localStorage.getItem("pst_draft_naive");
+    if (savedNaive !== null && savedNaive !== undefined) codeNaive.value = savedNaive;
+    const savedGen = localStorage.getItem("pst_draft_gen");
+    if (savedGen !== null && savedGen !== undefined) codeGen.value = savedGen;
+
+    if (localStorage.getItem("pst_codes_collapsed") === "true") {
+      setCodesCollapsed(true);
+    }
+
+    const savedTab = localStorage.getItem("pst_active_code_tab");
+    if (savedTab) {
+      switchCodeTab(savedTab);
+    }
+  } catch (e) {}
 });

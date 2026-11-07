@@ -11,6 +11,9 @@
   <!-- ヘッダー -->
   <header>
     <div class="logo-area">
+      <button id="btn-header-toggle-sidebar" class="sidebar-header-toggle-btn" title="サイドバーを開閉 (Ctrl+B / ⌘B)">
+        ☰
+      </button>
       <div class="logo-icon">📈</div>
       <div>
         <h1>Array Graph</h1>
@@ -25,10 +28,18 @@
   </header>
 
   <!-- メインコンテンツ -->
-  <div class="app-container">
+  <div class="app-container" id="app-container">
 
     <!-- サイドバー (入力・設定・統計) -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
+
+      <!-- サイドバー上部ヘッダー (折りたたみボタン) -->
+      <div class="sidebar-header">
+        <span class="sidebar-header-title">設定・データ入力</span>
+        <button id="btn-close-sidebar" class="sidebar-close-btn" title="サイドバーを閉じる (Ctrl+B / ⌘B)">
+          ◀ 閉じる
+        </button>
+      </div>
 
       <!-- 1. 入力セクション -->
       <div class="control-section">
@@ -182,9 +193,18 @@
     <!-- メインワークスペース (キャンバス) -->
     <main class="workspace">
 
+      <!-- 折りたたみ時の展開フローティングボタン -->
+      <button id="btn-floating-expand" class="floating-sidebar-toggle" title="サイドバーを開く (Ctrl+B / ⌘B)">
+        ▶ パネルを開く
+      </button>
+
       <!-- ツールバー -->
       <div class="workspace-toolbar">
         <div class="toolbar-group">
+          <button id="btn-toggle-sidebar" class="btn btn-secondary sidebar-toggle-btn" title="サイドバーを開閉 (Ctrl+B / ⌘B)">
+            <span id="sidebar-toggle-icon">◀</span>
+            <span id="sidebar-toggle-text">パネルを隠す</span>
+          </button>
           <button id="btn-zoom-in" class="btn btn-secondary" title="拡大">🔍 拡大</button>
           <button id="btn-zoom-out" class="btn btn-secondary" title="縮小">🔍 縮小</button>
           <button id="btn-reset-view" class="btn btn-secondary" title="全体を表示 (リセット)">🔄 全体表示</button>
