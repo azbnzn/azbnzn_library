@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BiCoef.hpp"
+#include "BIT2D.hpp"
 #include "CoordinateCompression.hpp"
 #include "Dijkstra.hpp"
 #include "DisjointSparseTable.hpp"

@@ -18,6 +18,7 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
     - [SparseTable](#sparsetable)
     - [DisjointSparseTable](#disjointsparsetable)
     - [SegTree2D (2次元セグ木)](#segtree2d-2次元セグ木)
+    - [BIT2D (動的2次元BIT・双対BIT・領域加算和)](#bit2d-動的2次元bit双対bit領域加算和)
     - [DynamicSegTree (動的セグ木)](#dynamicsegtree-動的セグ木)
     - [PersistentSegTree (永続セグ木)](#persistentsegtree-永続セグ木)
     - [SqrtDecomposition (平方分割)](#sqrtdecomposition-平方分割)
@@ -28,7 +29,7 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
     - [TwoPointers (尺取り法)](#twopointers-尺取り法)
     - [ZobristHash (多重集合・区間一致・順列判定・動的ハッシュ)](#zobristhash-多重集合区間一致順列判定動的ハッシュ)
     - [IntervalSet / IntervalMap (区間を set で管理するテク・mex・Chtholly Tree)](#intervalset--intervalmap-区間を-set-で管理するテクmexchtholly-tree)
-    - [MultiDimensionalCumulativeSum (多次元累積和・多次元いもす法・多次元BIT)](#multidimensionalcumulativesum-多次元累積和多次元いもす法多次元bit)
+    - [MultiDimensionalCumulativeSum (3次元以上の多次元累積和・多次元いもす法)](#multidimensionalcumulativesum-3次元以上の多次元累積和多次元いもす法)
   - [2. 文字列 (Strings)](#2-文字列-strings)
     - [DoubleRollingHash (安全なダブルローリングハッシュ・点更新対応)](#doublerollinghash-安全なダブルローリングハッシュ点更新対応)
     - [DynamicStringTreap (動的文字列平衡二分木)](#dynamicstringtreap-動的文字列平衡二分木)
@@ -75,6 +76,7 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
 | 静的配列の区間最小値・最大値・gcd (更新なし) | `SparseTable<S, op>` | 構築 $O(N \log N)$<br>クエリ $O(1)$ | `SparseTable.hpp` |
 | 静的配列の区間積・区間和 (非可換・モノイド) | `DisjointSparseTable<S, op>` | 構築 $O(N \log N)$<br>クエリ $O(1)$ | `DisjointSparseTable.hpp` |
 | グリッド・2次元平面の矩形領域クエリ | `SegTree2D<S, op, e>` | クエリ $O(\log H \log W)$ | `SegTree2D.hpp` |
+| 動的2次元BIT・双対2次元BIT・領域加算和 (RAQ) | `BIT2D` / `DualBIT2D` / `RangeAddBIT2D` | クエリ $O(\log H \log W)$ | `BIT2D.hpp` |
 | 座標が $10^9$ や $10^{18}$ と巨大なセグ木 | `DynamicSegTree<S, op, e>` | クエリ $O(\log C)$ | `DynamicSegTree.hpp` |
 | 過去の状態へのクエリ・ロールバック・復元 | `PersistentSegTree<S, op, e>` | 点更新 $O(\log N)$<br>クエリ $O(\log N)$ | `PersistentSegTree.hpp` |
 | ブロック単位の平方分割（ACL segtree 互換） | `SqrtDecomposition<S, op, e>` | クエリ $O(\sqrt{N})$ | `SqrtDecomposition.hpp` |
@@ -85,7 +87,7 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
 | 尺取り法（単調性のある区間条件の極大区間列挙） | `two_pointers` | $O(N)$ | `TwoPointers.hpp` |
 | 区間多重集合一致・区間順列判定・状態ハッシュ | `ZobristHash` / `DynamicZobristHash` | 構築 $O(N)$<br>クエリ $O(1)$ / $O(\log N)$ | `ZobristHash.hpp` |
 | 区間の集合管理・マージ・被覆長・mex・区間色塗り | `IntervalSet` / `IntervalMap` | ならし $O(\log N)$ / クエリ $O(\log N)$ | `IntervalSet.hpp` |
-| 多次元累積和・多次元いもす法・多次元BIT | `MultiDimensionalPrefixSum` / `MultiDimensionalImos` / `MultiDimensionalBIT` | 構築 $O(D \cdot \prod N_k)$<br>クエリ $O(2^D)$ / $O(1)$ / $O(\prod \log N_k)$ | `MultiDimensionalCumulativeSum.hpp` |
+| 3次元以上の多次元累積和・多次元いもす法 | `MultiDimensionalPrefixSum` / `MultiDimensionalImos` / `PrefixSum3D` | 構築 $O(D \cdot \prod N_k)$<br>クエリ $O(2^D)$ / $O(1)$ | `MultiDimensionalCumulativeSum.hpp` |
 | 文字列一致判定・点更新クエリ・回文判定 | `DoubleRollingHash` | ハッシュ取得 $O(1)$ / 更新 $O(\log N)$<br>LCP $O(\log N)$ | `DoubleRollingHash.hpp` |
 | 文字列の任意位置挿入・削除・区間文字種数 | `DynamicStringTreap` | 各種操作 $O(\log N)$ | `DynamicStringTreap.hpp` |
 | 複数文字列のプレフィックス検索・辞書 | `Trie` / `MapTrie<T>` | 挿入・検索 $O(|S|)$ | `Trie.hpp` |
@@ -649,6 +651,233 @@ private:
     return res;
   }
 };
+```
+
+</details>
+
+#### BIT2D (動的2次元BIT・双対BIT・領域加算和)
+2次元グリッド $H \times W$ に対し、オンライン（動的）に更新クエリと区間和クエリを $O(\log H \log W)$ で高速処理するデータ構造です。
+「点加算・矩形和」の通常版、いもす法の動的版にあたる「矩形加算・一点取得」の双対版、そして「矩形加算・矩形和取得（RAQ）」の完全対応版の3クラスを提供します。
+
+- **ファイル**: `mylib/BIT2D.hpp`
+- **提供クラス**:
+  - `BIT2D<T>`: 点加算 `add(r, c, v)`・矩形和取得 `sum(r1, c1, r2, c2)`
+  - `DualBIT2D<T>`: 矩形加算 `add(r1, c1, r2, c2, v)`・1点取得 `get(r, c)`
+  - `RangeAddBIT2D<T>`: 矩形加算 `add(r1, c1, r2, c2, v)`・矩形和取得 `sum(r1, c1, r2, c2)`（RAQ）
+- **計算量**:
+  - 各種クエリ: $O(\log H \log W)$
+  - 空間計算量: $O(HW)$
+
+```cpp
+#include "mylib/BIT2D.hpp"
+
+// 1. 通常の 2D BIT (点加算・矩形和取得)
+BIT2D<long long> bit(5, 6);
+bit.add(1, 2, 10);
+bit.add(3, 4, 20);
+assert(bit.sum(0, 0, 5, 6) == 30);
+assert(bit.sum(1, 2, 2, 3) == 10);
+
+// 2. 双対 2D BIT (矩形加算・一点取得)
+DualBIT2D<long long> dbit(5, 6);
+dbit.add(1, 1, 4, 5, 7); // [1, 4) x [1, 5) に +7
+assert(dbit.get(1, 1) == 7);
+assert(dbit.get(0, 0) == 0);
+
+// 3. 領域加算・領域和取得 (Range Add Range Sum Query)
+RangeAddBIT2D<long long> raq(6, 6);
+raq.add(1, 1, 4, 4, 5); // 3x3 領域に +5
+assert(raq.sum(1, 1, 4, 4) == 45); // 9マス * 5 = 45
+assert(raq.get(1, 1) == 5);
+```
+
+<details>
+<summary><b>ソースコードを展開 (BIT2D.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <cassert>
+#include <iostream>
+#include <vector>
+
+using namespace std;
+
+// ============================================================================
+// 動的2次元 BIT (2D Binary Indexed Tree / Fenwick Tree)
+// ============================================================================
+// 【概要】
+// 2次元グリッド H x W に対し、オンライン（動的）に更新クエリと区間和クエリを
+// 高速に処理するデータ構造です。
+//
+// 【提供クラス】
+// 1. BIT2D<T>:
+//    - 点加算 add(r, c, val) (O(log H log W))
+//    - 矩形和 sum(r1, c1, r2, c2) (O(log H log W))
+//    - プレフィックス和 prefix_sum(r, c) (O(log H log W))
+//    - 1点取得 get(r, c) (O(log H log W))
+//
+// 2. DualBIT2D<T>: (双対2次元 BIT)
+//    - 矩形加算 add(r1, c1, r2, c2, val) (O(log H log W))
+//    - 1点取得 get(r, c) (O(log H log W))
+//
+// 3. RangeAddBIT2D<T>: (領域加算・領域和取得 RAQ - 4本の BIT を使用)
+//    - 矩形加算 add(r1, c1, r2, c2, val) (O(log H log W))
+//    - 矩形和 sum(r1, c1, r2, c2) (O(log H log W))
+//
+// ※すべての区間は 0-indexed 半開区間 [r1, r2) x [c1, c2) です。
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. BIT2D (点加算・矩形和取得)
+// ----------------------------------------------------------------------------
+template <typename T = long long>
+class BIT2D {
+private:
+  int H = 0, W = 0;
+  std::vector<T> tree;
+
+  inline int id(int r, int c) const {
+    return r * (W + 1) + c;
+  }
+
+public:
+  BIT2D() {}
+  BIT2D(int h, int w) : H(h), W(w), tree((h + 1) * (w + 1), T(0)) {}
+
+  // 点 (r, c) に val を加算 (O(log H log W))
+  void add(int r, int c, T val) {
+    assert(0 <= r && r < H && 0 <= c && c < W);
+    for (int i = r + 1; i <= H; i += i & -i) {
+      for (int j = c + 1; j <= W; j += j & -j) {
+        tree[id(i, j)] += val;
+      }
+    }
+  }
+
+  // 半開区間 [0, r) x [0, c) のプレフィックス総和 (O(log H log W))
+  T prefix_sum(int r, int c) const {
+    r = std::max(0, std::min(r, H));
+    c = std::max(0, std::min(c, W));
+    T res = 0;
+    for (int i = r; i > 0; i -= i & -i) {
+      for (int j = c; j > 0; j -= j & -j) {
+        res += tree[id(i, j)];
+      }
+    }
+    return res;
+  }
+
+  // 矩形区間 [r1, r2) x [c1, c2) の総和 (O(log H log W))
+  T sum(int r1, int c1, int r2, int c2) const {
+    if (r1 >= r2 || c1 >= c2) return T(0);
+    assert(0 <= r1 && r2 <= H && 0 <= c1 && c2 <= W);
+    return prefix_sum(r2, c2) - prefix_sum(r1, c2) - prefix_sum(r2, c1) + prefix_sum(r1, c1);
+  }
+
+  // 点 (r, c) の現在の値を取得 (O(log H log W))
+  T get(int r, int c) const {
+    return sum(r, c, r + 1, c + 1);
+  }
+
+  int height() const { return H; }
+  int width() const { return W; }
+};
+
+// ----------------------------------------------------------------------------
+// 2. DualBIT2D (矩形加算・一点取得 / 双対 2D BIT)
+// ----------------------------------------------------------------------------
+template <typename T = long long>
+class DualBIT2D {
+private:
+  int H = 0, W = 0;
+  BIT2D<T> bit;
+
+public:
+  DualBIT2D() {}
+  DualBIT2D(int h, int w) : H(h), W(w), bit(h + 1, w + 1) {}
+
+  // 矩形区間 [r1, r2) x [c1, c2) に val を加算 (O(log H log W))
+  void add(int r1, int c1, int r2, int c2, T val) {
+    if (r1 >= r2 || c1 >= c2) return;
+    assert(0 <= r1 && r2 <= H && 0 <= c1 && c2 <= W);
+    bit.add(r1, c1, val);
+    bit.add(r1, c2, -val);
+    bit.add(r2, c1, -val);
+    bit.add(r2, c2, val);
+  }
+
+  // 点 (r, c) の現在の値を取得 (O(log H log W))
+  T get(int r, int c) const {
+    assert(0 <= r && r < H && 0 <= c && c < W);
+    return bit.prefix_sum(r + 1, c + 1);
+  }
+
+  int height() const { return H; }
+  int width() const { return W; }
+};
+
+// ----------------------------------------------------------------------------
+// 3. RangeAddBIT2D (矩形加算・矩形和取得 RAQ / 4本の BIT を使用)
+// ----------------------------------------------------------------------------
+template <typename T = long long>
+class RangeAddBIT2D {
+private:
+  int H = 0, W = 0;
+  BIT2D<T> bit_xy, bit_x, bit_y, bit_0;
+
+  void add_point(int r, int c, T val) {
+    bit_xy.add(r, c, val);
+    bit_x.add(r, c, -val * c);
+    bit_y.add(r, c, -val * r);
+    bit_0.add(r, c, val * r * c);
+  }
+
+public:
+  RangeAddBIT2D() {}
+  RangeAddBIT2D(int h, int w)
+      : H(h), W(w),
+        bit_xy(h + 1, w + 1), bit_x(h + 1, w + 1),
+        bit_y(h + 1, w + 1), bit_0(h + 1, w + 1) {}
+
+  // 矩形区間 [r1, r2) x [c1, c2) に val を一括加算 (O(log H log W))
+  void add(int r1, int c1, int r2, int c2, T val) {
+    if (r1 >= r2 || c1 >= c2) return;
+    assert(0 <= r1 && r2 <= H && 0 <= c1 && c2 <= W);
+    add_point(r1, c1, val);
+    add_point(r1, c2, -val);
+    add_point(r2, c1, -val);
+    add_point(r2, c2, val);
+  }
+
+  // 半開区間 [0, r) x [0, c) のプレフィックス総和 (O(log H log W))
+  T prefix_sum(int r, int c) const {
+    r = std::max(0, std::min(r, H));
+    c = std::max(0, std::min(c, W));
+    return bit_xy.prefix_sum(r, c) * r * c +
+           bit_x.prefix_sum(r, c) * r +
+           bit_y.prefix_sum(r, c) * c +
+           bit_0.prefix_sum(r, c);
+  }
+
+  // 矩形区間 [r1, r2) x [c1, c2) の総和 (O(log H log W))
+  T sum(int r1, int c1, int r2, int c2) const {
+    if (r1 >= r2 || c1 >= c2) return T(0);
+    assert(0 <= r1 && r2 <= H && 0 <= c1 && c2 <= W);
+    return prefix_sum(r2, c2) - prefix_sum(r1, c2) - prefix_sum(r2, c1) + prefix_sum(r1, c1);
+  }
+
+  // 点 (r, c) の現在の値を取得 (O(log H log W))
+  T get(int r, int c) const {
+    return sum(r, c, r + 1, c + 1);
+  }
+
+  int height() const { return H; }
+  int width() const { return W; }
+};
+
+template <typename T = long long>
+using FenwickTree2D = BIT2D<T>;
+
 ```
 
 </details>
@@ -3421,83 +3650,63 @@ using IntervalMapLL = IntervalMap<long long, long long>;
 
 </details>
 
-#### MultiDimensionalCumulativeSum (多次元累積和・多次元いもす法・多次元BIT)
-任意の次元 $D$（1次元、2次元、3次元、任意多次元）に対する**累積和（Prefix Sum）**、**いもす法（Imos Method）**、およびオンラインで更新とクエリが交互に走る **Binary Indexed Tree (BIT / Dual BIT)** を提供する総合ライブラリです。
-
-「一点更新・区間和取得」と「区間更新・一点取得」の双対関係に対応し、静的（オフライン）構築と動的（オンライン）クエリの両方を網羅しています。
+#### MultiDimensionalCumulativeSum (3次元以上の多次元累積和・多次元いもす法)
+3次元以上の高次元空間（$D \ge 3$）に対する**累積和（Prefix Sum）**および**いもす法（Imos Method）**の総合ライブラリです。
+2次元以下の累積和・いもす法と異なり、高次元では手動の多重ループや包除原理の符号管理が極めて複雑でバグの温床となるため、任意の $D \ge 3$ 次元に対して軸ごとの走査構築と $O(2^D)$ 包除原理クエリを安全かつ高速に実行できます。
 
 - **ファイル**: `mylib/MultiDimensionalCumulativeSum.hpp` (または `mylib/CumulativeSum.hpp`, `mylib/PrefixSum.hpp`)
-- **提供されるクラス体系**:
-  1. **静的一点加算・区間和取得 (Prefix Sum)**:
-     - `MultiDimensionalPrefixSum<T, D>`: テンプレート次元 $D$（高速・スタック座標）
-     - `DynamicPrefixSumND<T>`: 実行時に動的に次元数を決められるクラス
-     - `PrefixSum2D<T>`, `PrefixSum3D<T>`, `PrefixSum1D<T>`: 座標配列不要の便利ラッパー（2Dグリッド構築にも対応）
+- **提供クラス**:
+  1. **静的一点加算・超直方体区間和取得 (Prefix Sum)**:
+     - `MultiDimensionalPrefixSum<T, D = 3>`: テンプレート固定次元 $D$（$D \ge 3$）
+     - `DynamicPrefixSumND<T>`: 実行時に動的に次元数を指定できるクラス（$D \ge 3$）
+     - `PrefixSum3D<T>`: 座標配列を作らず `(x, y, z)` で直感的に呼べる 3次元専用ラッパー
   2. **静的区間更新・一点取得 (Imos Method)**:
-     - `MultiDimensionalImos<T, D>`: 超直方体への一括加算 $\to$ `build()` $\to$ 各マス最終値取得
-     - `DynamicImosND<T>`: 実行時任意次元版
-     - `Imos2D<T>`, `Imos3D<T>`, `Imos1D<T>`: 2D/3D/1D 便利ラッパー（`to_grid()` でグリッド復元可能）
-  3. **動的一点加算・区間和取得 (Multi-Dimensional Fenwick Tree / BIT)**:
-     - `MultiDimensionalBIT<T, D>`: オンラインで点加算と超直方体区間和取得
-     - `BIT2D<T>`, `BIT3D<T>`, `BIT1D<T>`
-  4. **動的区間更新・一点取得 (Multi-Dimensional Dual BIT)**:
-     - `MultiDimensionalDualBIT<T, D>`: オンラインで超直方体区間加算と1マス取得
-     - `DualBIT2D<T>`, `DualBIT3D<T>`, `DualBIT1D<T>`
+     - `MultiDimensionalImos<T, D = 3>`: 超直方体への一括加算 $\to$ `build()` $\to$ 各マス最終値取得（$D \ge 3$）
+     - `DynamicImosND<T>`: 実行時次元指定版（$D \ge 3$）
+     - `Imos3D<T>`: 3次元専用いもす法ラッパー
 - **計算量**:
-  - **静的累積和**: 構築 $O(D \cdot \prod N_k)$、区間和クエリ $O(2^D)$、1マス取得 $O(1)$
-  - **静的いもす法**: 区間加算 $O(2^D)$、構築 $O(D \cdot \prod N_k)$、1マス取得 $O(1)$
-  - **多次元BIT**: 点加算 $O(\prod \log N_k)$、区間和クエリ $O(2^D \prod \log N_k)$
-  - **多次元Dual BIT**: 区間加算 $O(2^D \prod \log N_k)$、1マス取得 $O(\prod \log N_k)$
+  - **多次元累積和**: 構築 $O(D \cdot \prod N_k)$、超直方体区間和クエリ $O(2^D)$、1点取得 $O(1)$
+  - **多次元いもす法**: 超直方体加算 $O(2^D)$、構築 $O(D \cdot \prod N_k)$、1点取得 $O(1)$
 
 ```cpp
 #include "mylib/MultiDimensionalCumulativeSum.hpp"
 
 // -------------------------------------------------------------
-// 1. 2次元累積和 (PrefixSum2D) - 2Dグリッドの区間和取得
+// 1. 3次元累積和 (PrefixSum3D) - 直方体領域の区間和
 // -------------------------------------------------------------
-vector<vector<long long>> grid = {
-    {1, 2, 3},
-    {4, 5, 6},
-    {7, 8, 9}
-};
-PrefixSum2D<long long> ps(grid);
-// [1, 3) x [1, 3) の矩形和 (5 + 6 + 8 + 9 = 28)
-assert(ps.sum(1, 1, 3, 3) == 28);
-assert(ps.get(1, 1) == 5);
+PrefixSum3D<long long> ps3(3, 4, 5);
+ps3.add(1, 2, 3, 100);
+ps3.build(); // 各軸ごとに O(XYZ) で一括累積
+assert(ps3.sum(0, 0, 0, 3, 4, 5) == 100);
+assert(ps3.sum(1, 2, 3, 2, 3, 4) == 100);
+assert(ps3.get(1, 2, 3) == 100);
 
 // -------------------------------------------------------------
-// 2. 2次元いもす法 (Imos2D) - 矩形加算と最終マス値取得
+// 2. 3次元いもす法 (Imos3D) - 直方体領域への一括加算
 // -------------------------------------------------------------
-Imos2D<long long> imos(4, 5);
-imos.add(1, 1, 3, 4, 10); // [1, 3) x [1, 4) に +10
-imos.add(2, 2, 4, 5, 5);  // [2, 4) x [2, 5) に +5
-imos.build();
-assert(imos.get(1, 1) == 10);
-assert(imos.get(2, 2) == 15); // 重複部は 15
-
-// -------------------------------------------------------------
-// 3. 動的2次元BIT / Dual BIT (オンライン更新・クエリ)
-// -------------------------------------------------------------
-BIT2D<long long> bit(3, 3);
-bit.add(1, 1, 7); // (1, 1) に 7 加算 (O(log H log W))
-assert(bit.sum(0, 0, 2, 2) == 7);
-
-DualBIT2D<long long> dual_bit(4, 4);
-dual_bit.add(1, 1, 3, 3, 100); // [1, 3) x [1, 3) に一括加算
-assert(dual_bit.get(1, 1) == 100);
-
-// -------------------------------------------------------------
-// 4. 任意次元 (3次元・4次元以上) 累積和・いもす法
-// -------------------------------------------------------------
-MultiDimensionalPrefixSum<long long, 3> ps3({3, 4, 5});
-ps3.add({1, 2, 3}, 42);
-ps3.build();
-assert(ps3.sum({0, 0, 0}, {3, 4, 5}) == 42);
-assert(ps3.sum({1, 2, 3}, {2, 3, 4}) == 42);
-
-MultiDimensionalImos<long long, 3> imos3({3, 4, 5});
-imos3.add({0, 0, 0}, {2, 2, 2}, 7);
+Imos3D<long long> imos3(4, 4, 4);
+imos3.add(1, 1, 1, 3, 3, 3, 42); // [1, 3) x [1, 3) x [1, 3) に +42
 imos3.build();
-assert(imos3.get({1, 1, 1}) == 7);
+assert(imos3.get(1, 1, 1) == 42);
+assert(imos3.get(2, 2, 2) == 42);
+assert(imos3.get(0, 0, 0) == 0);
+
+// -------------------------------------------------------------
+// 3. 4次元以上の超空間累積和 (MultiDimensionalPrefixSum)
+// -------------------------------------------------------------
+MultiDimensionalPrefixSum<long long, 4> ps4({2, 3, 2, 3});
+ps4.add({0, 1, 0, 1}, 55);
+ps4.build();
+assert(ps4.sum({0, 0, 0, 0}, {2, 3, 2, 3}) == 55);
+assert(ps4.sum({0, 1, 0, 1}, {1, 2, 1, 2}) == 55);
+
+// -------------------------------------------------------------
+// 4. 実行時任意多次元いもす法 (DynamicImosND)
+// -------------------------------------------------------------
+DynamicImosND<long long> dimos({3, 3, 3});
+dimos.add({1, 1, 1}, {3, 3, 3}, 99);
+dimos.build();
+assert(dimos.get({1, 1, 1}) == 99);
 ```
 
 <details>
@@ -3515,43 +3724,36 @@ assert(imos3.get({1, 1, 1}) == 7);
 using namespace std;
 
 // ============================================================================
-// 多次元累積和 & 多次元いもす法 (Multi-Dimensional Prefix Sum & Imos & BIT)
+// 多次元累積和 & 多次元いもす法 (3次元以上 / Multi-Dimensional Prefix Sum & Imos)
 // ============================================================================
 // 【概要】
-// 任意の次元 D に対する累積和（Prefix Sum）、いもす法（Imos Method）、
-// およびオンラインで更新とクエリが交互に走る Binary Indexed Tree (BIT) を提供します。
+// 3次元以上の空間（D >= 3）に対する累積和（Prefix Sum）およびいもす法（Imos Method）
+// を提供します。
 //
 // 【提供クラス】
-// 1. 静的一点更新・区間和取得 (Prefix Sum):
-//    - MultiDimensionalPrefixSum<T, D>: 点加算 -> build() (O(D * M)) -> 超直方体区間和取得 (O(2^D))
-//    - DynamicPrefixSumND<T>: 実行時に次元 D を指定できる動的次元版
-//    - PrefixSum2D<T> / PrefixSum3D<T> / PrefixSum1D<T>: 座標配列不要の便利ラッパー
+// 1. 静的一点加算・超直方体区間和取得 (Prefix Sum):
+//    - MultiDimensionalPrefixSum<T, D = 3>: テンプレート次元 D (D >= 3)
+//      各軸ごとの走査構築 O(D * prod N_k) -> 包除原理による超直方体区間和取得 O(2^D)
+//    - DynamicPrefixSumND<T>: 実行時に次元数を指定できる動的次元版 (D >= 3)
+//    - PrefixSum3D<T>: 座標配列を作らず (x, y, z) で直接呼べる 3次元専用ラッパー
 //
 // 2. 静的区間更新・一点取得 (Imos Method):
-//    - MultiDimensionalImos<T, D>: 超直方体加算 (O(2^D)) -> build() (O(D * M)) -> 一点取得 (O(1))
-//    - DynamicImosND<T>: 実行時次元指定版
-//    - Imos2D<T> / Imos3D<T> / Imos1D<T>: 座標配列不要の便利ラッパー
+//    - MultiDimensionalImos<T, D = 3>: テンプレート次元 D (D >= 3)
+//      超直方体加算 O(2^D) -> 各軸ごとの走査構築 O(D * prod N_k) -> 各マス最終値取得 O(1)
+//    - DynamicImosND<T>: 実行時次元指定版 (D >= 3)
+//    - Imos3D<T>: 座標配列を作らず (x, y, z) で直接呼べる 3次元専用ラッパー
 //
-// 3. 動的一点更新・区間和取得 (Multi-Dimensional BIT / Fenwick Tree):
-//    - MultiDimensionalBIT<T, D>: 点加算 (O(prod log N_k)) <-> 超直方体区間和 (O(2^D prod log N_k))
-//    - BIT2D<T> / BIT3D<T> / BIT1D<T>: 2D/3D/1D 便利ラッパー
-//
-// 4. 動的区間更新・一点取得 (Multi-Dimensional Dual BIT):
-//    - MultiDimensionalDualBIT<T, D>: 超直方体加算 (O(2^D prod log N_k)) <-> 一点取得 (O(prod log N_k))
-//    - DualBIT2D<T> / DualBIT3D<T> / DualBIT1D<T>: 2D/3D/1D 便利ラッパー
-//
-// 【区間表現】
-// 0-indexed 半開区間 [l, r) を標準としています。
-// 例 (2D): [r1, r2) x [c1, c2)
-// 例 (D次元): 点 l = (l_0, ..., l_{D-1}), 点 r = (r_0, ..., r_{D-1}) に対して
-//             [l_0, r_0) x ... x [l_{D-1}, r_{D-1})
+// ※すべての区間は 0-indexed 半開区間 [l, r) です。
+//   超直方体: [l_0, r_0) x [l_1, r_1) x ... x [l_{D-1}, r_{D-1})
 // ============================================================================
 
 // ----------------------------------------------------------------------------
-// 1. MultiDimensionalPrefixSum<T, D> (静的一点加算・区間和取得)
+// 1. MultiDimensionalPrefixSum<T, D> (静的一点加算・超直方体区間和取得, D >= 3)
 // ----------------------------------------------------------------------------
-template <typename T = long long, size_t D = 2>
+template <typename T = long long, size_t D = 3>
 class MultiDimensionalPrefixSum {
+  static_assert(D >= 3, "MultiDimensionalPrefixSum is intended for D >= 3.");
+
 public:
   using Point = std::array<int, D>;
 
@@ -3687,10 +3889,12 @@ public:
 };
 
 // ----------------------------------------------------------------------------
-// 2. MultiDimensionalImos<T, D> (静的区間更新・一点取得)
+// 2. MultiDimensionalImos<T, D> (静的区間更新・一点取得, D >= 3)
 // ----------------------------------------------------------------------------
-template <typename T = long long, size_t D = 2>
+template <typename T = long long, size_t D = 3>
 class MultiDimensionalImos {
+  static_assert(D >= 3, "MultiDimensionalImos is intended for D >= 3.");
+
 public:
   using Point = std::array<int, D>;
 
@@ -3787,181 +3991,7 @@ public:
 };
 
 // ----------------------------------------------------------------------------
-// 3. MultiDimensionalBIT<T, D> (動的一点加算・区間和取得 Fenwick Tree)
-// ----------------------------------------------------------------------------
-template <typename T = long long, size_t D = 2>
-class MultiDimensionalBIT {
-public:
-  using Point = std::array<int, D>;
-
-private:
-  Point shape{};
-  std::array<int, D + 1> stride{};
-  std::vector<T> tree;
-
-  template <size_t dim = 0>
-  void add_internal(const Point &p, T val, int base_idx) {
-    if constexpr (dim == D) {
-      tree[base_idx] += val;
-    } else {
-      int limit = shape[dim];
-      int step = stride[dim + 1];
-      for (int i = p[dim] + 1; i <= limit; i += i & -i) {
-        add_internal<dim + 1>(p, val, base_idx + i * step);
-      }
-    }
-  }
-
-  template <size_t dim = 0>
-  T sum_internal(const Point &r, int base_idx) const {
-    if constexpr (dim == D) {
-      return tree[base_idx];
-    } else {
-      T res = 0;
-      int step = stride[dim + 1];
-      for (int i = r[dim]; i > 0; i -= i & -i) {
-        res += sum_internal<dim + 1>(r, base_idx + i * step);
-      }
-      return res;
-    }
-  }
-
-public:
-  MultiDimensionalBIT() {}
-
-  explicit MultiDimensionalBIT(const Point &shp) : shape(shp) {
-    stride[D] = 1;
-    for (int k = (int)D - 1; k >= 0; --k) {
-      stride[k] = stride[k + 1] * (shape[k] + 1);
-    }
-    tree.assign(stride[0], T(0));
-  }
-
-  MultiDimensionalBIT(std::initializer_list<int> shp_list) {
-    assert(shp_list.size() == D);
-    size_t idx = 0;
-    for (int s : shp_list) shape[idx++] = s;
-    stride[D] = 1;
-    for (int k = (int)D - 1; k >= 0; --k) {
-      stride[k] = stride[k + 1] * (shape[k] + 1);
-    }
-    tree.assign(stride[0], T(0));
-  }
-
-  // 点 p (0-indexed) に val を加算 (O(prod log N_k))
-  void add(const Point &p, T val) {
-    for (size_t k = 0; k < D; ++k) {
-      assert(0 <= p[k] && p[k] < shape[k]);
-    }
-    add_internal<0>(p, val, 0);
-  }
-
-  // 半開区間 [0, r_0) x ... x [0, r_{D-1}) のプレフィックス和 (O(prod log N_k))
-  T prefix_sum(const Point &r) const {
-    for (size_t k = 0; k < D; ++k) {
-      assert(0 <= r[k] && r[k] <= shape[k]);
-    }
-    return sum_internal<0>(r, 0);
-  }
-
-  // 超直方体 [l_0, r_0) x ... x [l_{D-1}, r_{D-1}) の区間和 (O(2^D prod log N_k))
-  T sum(const Point &l, const Point &r) const {
-    for (size_t k = 0; k < D; ++k) {
-      if (l[k] >= r[k]) return T(0);
-      assert(0 <= l[k] && r[k] <= shape[k]);
-    }
-    T res = 0;
-    for (int mask = 0; mask < (1 << D); ++mask) {
-      Point coords;
-      int popcount = 0;
-      for (size_t k = 0; k < D; ++k) {
-        if (mask & (1 << k)) {
-          coords[k] = l[k];
-          popcount++;
-        } else {
-          coords[k] = r[k];
-        }
-      }
-      T s = prefix_sum(coords);
-      if (popcount & 1) res -= s;
-      else res += s;
-    }
-    return res;
-  }
-
-  const Point &get_shape() const { return shape; }
-};
-
-// ----------------------------------------------------------------------------
-// 4. MultiDimensionalDualBIT<T, D> (動的区間更新・一点取得 Dual Fenwick Tree)
-// ----------------------------------------------------------------------------
-template <typename T = long long, size_t D = 2>
-class MultiDimensionalDualBIT {
-public:
-  using Point = std::array<int, D>;
-
-private:
-  Point shape{};
-  MultiDimensionalBIT<T, D> bit;
-
-public:
-  MultiDimensionalDualBIT() {}
-
-  explicit MultiDimensionalDualBIT(const Point &shp) : shape(shp) {
-    Point bit_shape;
-    for (size_t k = 0; k < D; ++k) bit_shape[k] = shape[k] + 1;
-    bit = MultiDimensionalBIT<T, D>(bit_shape);
-  }
-
-  MultiDimensionalDualBIT(std::initializer_list<int> shp_list) {
-    assert(shp_list.size() == D);
-    size_t idx = 0;
-    Point bit_shape;
-    for (int s : shp_list) {
-      shape[idx] = s;
-      bit_shape[idx] = s + 1;
-      idx++;
-    }
-    bit = MultiDimensionalBIT<T, D>(bit_shape);
-  }
-
-  // 超直方体 [l_0, r_0) x ... x [l_{D-1}, r_{D-1}) に val を一括加算 (O(2^D prod log N_k))
-  void add(const Point &l, const Point &r, T val) {
-    for (size_t k = 0; k < D; ++k) {
-      if (l[k] >= r[k]) return;
-      assert(0 <= l[k] && r[k] <= shape[k]);
-    }
-    for (int mask = 0; mask < (1 << D); ++mask) {
-      Point coords;
-      int popcount = 0;
-      for (size_t k = 0; k < D; ++k) {
-        if (mask & (1 << k)) {
-          coords[k] = r[k];
-          popcount++;
-        } else {
-          coords[k] = l[k];
-        }
-      }
-      T delta = (popcount & 1) ? -val : val;
-      bit.add(coords, delta);
-    }
-  }
-
-  // 点 p (0-indexed) の現在の値を取得 (O(prod log N_k))
-  T get(const Point &p) const {
-    for (size_t k = 0; k < D; ++k) {
-      assert(0 <= p[k] && p[k] < shape[k]);
-    }
-    Point coords;
-    for (size_t k = 0; k < D; ++k) coords[k] = p[k] + 1;
-    return bit.prefix_sum(coords);
-  }
-
-  const Point &get_shape() const { return shape; }
-};
-
-// ----------------------------------------------------------------------------
-// 5. DynamicPrefixSumND<T> & DynamicImosND<T> (実行時任意次元版)
+// 3. DynamicPrefixSumND<T> & DynamicImosND<T> (実行時任意多次元版, D >= 3)
 // ----------------------------------------------------------------------------
 template <typename T = long long>
 class DynamicPrefixSumND {
@@ -3984,6 +4014,7 @@ public:
   DynamicPrefixSumND() {}
   explicit DynamicPrefixSumND(const std::vector<int> &shp) : shape(shp) {
     D = (int)shape.size();
+    assert(D >= 3 && "DynamicPrefixSumND is intended for D >= 3.");
     stride.assign(D + 1, 1);
     for (int k = D - 1; k >= 0; --k) {
       stride[k] = stride[k + 1] * (shape[k] + 1);
@@ -4070,6 +4101,7 @@ public:
   DynamicImosND() {}
   explicit DynamicImosND(const std::vector<int> &shp) : shape(shp) {
     D = (int)shape.size();
+    assert(D >= 3 && "DynamicImosND is intended for D >= 3.");
     stride.assign(D + 1, 1);
     for (int k = D - 1; k >= 0; --k) {
       stride[k] = stride[k + 1] * (shape[k] + 1);
@@ -4131,141 +4163,7 @@ public:
 };
 
 // ============================================================================
-// 6. 2次元コンビニエンスラッパー (2D Wrappers)
-// ============================================================================
-template <typename T = long long>
-class PrefixSum2D {
-private:
-  MultiDimensionalPrefixSum<T, 2> ps;
-  int H = 0, W = 0;
-
-public:
-  PrefixSum2D() {}
-  PrefixSum2D(int h, int w) : ps({h, w}), H(h), W(w) {}
-
-  PrefixSum2D(const std::vector<std::vector<T>> &grid) {
-    H = (int)grid.size();
-    W = (H == 0 ? 0 : (int)grid[0].size());
-    ps = MultiDimensionalPrefixSum<T, 2>({H, W});
-    for (int r = 0; r < H; ++r) {
-      for (int c = 0; c < W; ++c) {
-        ps.set({r, c}, grid[r][c]);
-      }
-    }
-    build();
-  }
-
-  void set(int r, int c, T val) { ps.set({r, c}, val); }
-  void add(int r, int c, T val) { ps.add({r, c}, val); }
-  void build() { ps.build(); }
-
-  // 矩形 [r1, r2) x [c1, c2) の総和 (O(1))
-  T sum(int r1, int c1, int r2, int c2) const {
-    return ps.sum({r1, c1}, {r2, c2});
-  }
-
-  // プレフィックス [0, r) x [0, c) の総和 (O(1))
-  T prefix_sum(int r, int c) const {
-    return ps.prefix_sum({r, c});
-  }
-
-  // 点 (r, c) の値を取得 (O(1))
-  T get(int r, int c) const {
-    return ps.get({r, c});
-  }
-
-  T all_sum() const { return ps.all_sum(); }
-  int height() const { return H; }
-  int width() const { return W; }
-};
-
-template <typename T = long long>
-class Imos2D {
-private:
-  MultiDimensionalImos<T, 2> imos;
-  int H = 0, W = 0;
-
-public:
-  Imos2D() {}
-  Imos2D(int h, int w) : imos({h, w}), H(h), W(w) {}
-
-  // 矩形 [r1, r2) x [c1, c2) に val を加算 (O(1))
-  void add(int r1, int c1, int r2, int c2, T val) {
-    imos.add({r1, c1}, {r2, c2}, val);
-  }
-
-  // 累積和を計算して各マスの値を確定 (O(HW))
-  void build() { imos.build(); }
-
-  // マス (r, c) の値を取得 (O(1))
-  T get(int r, int c) const {
-    return imos.get({r, c});
-  }
-
-  std::vector<std::vector<T>> to_grid() const {
-    std::vector<std::vector<T>> res(H, std::vector<T>(W));
-    for (int r = 0; r < H; ++r) {
-      for (int c = 0; c < W; ++c) {
-        res[r][c] = imos.get({r, c});
-      }
-    }
-    return res;
-  }
-
-  int height() const { return H; }
-  int width() const { return W; }
-};
-
-template <typename T = long long>
-class BIT2D {
-private:
-  MultiDimensionalBIT<T, 2> bit;
-  int H = 0, W = 0;
-
-public:
-  BIT2D() {}
-  BIT2D(int h, int w) : bit({h, w}), H(h), W(w) {}
-
-  void add(int r, int c, T val) {
-    bit.add({r, c}, val);
-  }
-
-  T sum(int r1, int c1, int r2, int c2) const {
-    return bit.sum({r1, c1}, {r2, c2});
-  }
-
-  T prefix_sum(int r, int c) const {
-    return bit.prefix_sum({r, c});
-  }
-
-  int height() const { return H; }
-  int width() const { return W; }
-};
-
-template <typename T = long long>
-class DualBIT2D {
-private:
-  MultiDimensionalDualBIT<T, 2> dual_bit;
-  int H = 0, W = 0;
-
-public:
-  DualBIT2D() {}
-  DualBIT2D(int h, int w) : dual_bit({h, w}), H(h), W(w) {}
-
-  void add(int r1, int c1, int r2, int c2, T val) {
-    dual_bit.add({r1, c1}, {r2, c2}, val);
-  }
-
-  T get(int r, int c) const {
-    return dual_bit.get({r, c});
-  }
-
-  int height() const { return H; }
-  int width() const { return W; }
-};
-
-// ============================================================================
-// 7. 3次元コンビニエンスラッパー (3D Wrappers)
+// 4. 3次元コンビニエンスラッパー (3D Wrappers)
 // ============================================================================
 template <typename T = long long>
 class PrefixSum3D {
@@ -4281,19 +4179,25 @@ public:
   void add(int x, int y, int z, T val) { ps.add({x, y, z}, val); }
   void build() { ps.build(); }
 
+  // 直方体 [x1, x2) x [y1, y2) x [z1, z2) の総和 (O(1))
   T sum(int x1, int y1, int z1, int x2, int y2, int z2) const {
     return ps.sum({x1, y1, z1}, {x2, y2, z2});
   }
 
+  // プレフィックス [0, x) x [0, y) x [0, z) の総和 (O(1))
   T prefix_sum(int x, int y, int z) const {
     return ps.prefix_sum({x, y, z});
   }
 
+  // 点 (x, y, z) の値を取得 (O(1))
   T get(int x, int y, int z) const {
     return ps.get({x, y, z});
   }
 
   T all_sum() const { return ps.all_sum(); }
+  int size_x() const { return X; }
+  int size_y() const { return Y; }
+  int size_z() const { return Z; }
 };
 
 template <typename T = long long>
@@ -4306,87 +4210,34 @@ public:
   Imos3D() {}
   Imos3D(int x, int y, int z) : imos({x, y, z}), X(x), Y(y), Z(z) {}
 
+  // 直方体 [x1, x2) x [y1, y2) x [z1, z2) に val を加算 (O(1))
   void add(int x1, int y1, int z1, int x2, int y2, int z2, T val) {
     imos.add({x1, y1, z1}, {x2, y2, z2}, val);
   }
 
+  // 累積和を計算して各マスの値を確定 (O(XYZ))
   void build() { imos.build(); }
 
+  // 点 (x, y, z) の値を取得 (O(1))
   T get(int x, int y, int z) const {
     return imos.get({x, y, z});
   }
+
+  int size_x() const { return X; }
+  int size_y() const { return Y; }
+  int size_z() const { return Z; }
 };
-
-template <typename T = long long>
-class BIT3D {
-private:
-  MultiDimensionalBIT<T, 3> bit;
-  int X = 0, Y = 0, Z = 0;
-
-public:
-  BIT3D() {}
-  BIT3D(int x, int y, int z) : bit({x, y, z}), X(x), Y(y), Z(z) {}
-
-  void add(int x, int y, int z, T val) {
-    bit.add({x, y, z}, val);
-  }
-
-  T sum(int x1, int y1, int z1, int x2, int y2, int z2) const {
-    return bit.sum({x1, y1, z1}, {x2, y2, z2});
-  }
-};
-
-template <typename T = long long>
-class DualBIT3D {
-private:
-  MultiDimensionalDualBIT<T, 3> dual_bit;
-  int X = 0, Y = 0, Z = 0;
-
-public:
-  DualBIT3D() {}
-  DualBIT3D(int x, int y, int z) : dual_bit({x, y, z}), X(x), Y(y), Z(z) {}
-
-  void add(int x1, int y1, int z1, int x2, int y2, int z2, T val) {
-    dual_bit.add({x1, y1, z1}, {x2, y2, z2}, val);
-  }
-
-  T get(int x, int y, int z) const {
-    return dual_bit.get({x, y, z});
-  }
-};
-
-// ============================================================================
-// 8. 1次元コンビニエンスラッパー (1D Wrappers)
-// ============================================================================
-template <typename T = long long>
-using PrefixSum1D = MultiDimensionalPrefixSum<T, 1>;
-
-template <typename T = long long>
-using Imos1D = MultiDimensionalImos<T, 1>;
-
-template <typename T = long long>
-using BIT1D = MultiDimensionalBIT<T, 1>;
-
-template <typename T = long long>
-using DualBIT1D = MultiDimensionalDualBIT<T, 1>;
 
 // 汎用エイリアス
-template <typename T = long long, size_t D = 2>
+template <typename T = long long, size_t D = 3>
 using PrefixSumND = MultiDimensionalPrefixSum<T, D>;
 
-template <typename T = long long, size_t D = 2>
+template <typename T = long long, size_t D = 3>
 using ImosND = MultiDimensionalImos<T, D>;
-
-template <typename T = long long, size_t D = 2>
-using FenwickTreeND = MultiDimensionalBIT<T, D>;
-
-template <typename T = long long, size_t D = 2>
-using DualFenwickTreeND = MultiDimensionalDualBIT<T, D>;
 
 ```
 
 </details>
-
 ---
 
 ### 2. 文字列 (Strings)
@@ -7507,6 +7358,7 @@ inline Real convex_diameter(const Polygon &P) {
 #pragma once
 
 #include "BiCoef.hpp"
+#include "BIT2D.hpp"
 #include "CoordinateCompression.hpp"
 #include "Dijkstra.hpp"
 #include "DisjointSparseTable.hpp"
