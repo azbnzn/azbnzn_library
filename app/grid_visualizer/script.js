@@ -35,6 +35,14 @@ class GridVisualizer {
     this.initEvents();
     this.renderCyclePreview();
     this.resetGrid(this.h, this.w);
+
+    // 保存されていたサイドバー状態の復元
+    try {
+      const savedCollapsed = localStorage.getItem("grid_visualizer_sidebar_collapsed") === "true";
+      if (savedCollapsed) {
+        this.setSidebarCollapsed(true);
+      }
+    } catch (err) {}
   }
 
   get activeCycle() {
@@ -42,6 +50,15 @@ class GridVisualizer {
   }
 
   initDOM() {
+    // サイドバー開閉関連
+    this.appContainer = document.getElementById("app-container");
+    this.btnHeaderToggleSidebar = document.getElementById("btn-header-toggle-sidebar");
+    this.btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
+    this.btnCloseSidebar = document.getElementById("btn-close-sidebar");
+    this.btnFloatingExpand = document.getElementById("btn-floating-expand");
+    this.sidebarToggleIcon = document.getElementById("sidebar-toggle-icon");
+    this.sidebarToggleText = document.getElementById("sidebar-toggle-text");
+
     // グリッドサイズ入力
     this.inputH = document.getElementById("input-h");
     this.inputW = document.getElementById("input-w");
@@ -191,6 +208,20 @@ class GridVisualizer {
     // Undo / Redo
     document.getElementById("btn-undo").addEventListener("click", () => this.undo());
     document.getElementById("btn-redo").addEventListener("click", () => this.redo());
+
+    // サイドバー開閉
+    if (this.btnHeaderToggleSidebar) {
+      this.btnHeaderToggleSidebar.addEventListener("click", () => this.toggleSidebar());
+    }
+    if (this.btnToggleSidebar) {
+      this.btnToggleSidebar.addEventListener("click", () => this.toggleSidebar());
+    }
+    if (this.btnCloseSidebar) {
+      this.btnCloseSidebar.addEventListener("click", () => this.setSidebarCollapsed(true));
+    }
+    if (this.btnFloatingExpand) {
+      this.btnFloatingExpand.addEventListener("click", () => this.setSidebarCollapsed(false));
+    }
 
     // キーボードショートカット
     window.addEventListener("keydown", (e) => this.handleKeyDown(e));
@@ -625,6 +656,13 @@ class GridVisualizer {
     // モーダルが開いている場合は無視
     if (this.modalOverlay.classList.contains("active")) return;
 
+    // サイドバー開閉: Ctrl+B / Cmd+B
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+      e.preventDefault();
+      this.toggleSidebar();
+      return;
+    }
+
     // Undo: Ctrl+Z / Cmd+Z
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
@@ -995,6 +1033,32 @@ class GridVisualizer {
     const modeName = mode === "string" ? "文字列モード (#=黒)" : "数字モード";
     this.showToast(`H=${this.h}, W=${this.w} の盤面を【${modeName}】で読み込みました！`);
     return true;
+  }
+
+  toggleSidebar() {
+    if (!this.appContainer) return;
+    const isCollapsed = this.appContainer.classList.contains("sidebar-collapsed");
+    this.setSidebarCollapsed(!isCollapsed);
+  }
+
+  setSidebarCollapsed(collapsed) {
+    if (!this.appContainer) return;
+    if (collapsed) {
+      this.appContainer.classList.add("sidebar-collapsed");
+      if (this.sidebarToggleIcon) this.sidebarToggleIcon.textContent = "▶";
+      if (this.sidebarToggleText) this.sidebarToggleText.textContent = "パネルを表示";
+      if (this.btnToggleSidebar) this.btnToggleSidebar.classList.add("active");
+      if (this.btnHeaderToggleSidebar) this.btnHeaderToggleSidebar.classList.add("active");
+    } else {
+      this.appContainer.classList.remove("sidebar-collapsed");
+      if (this.sidebarToggleIcon) this.sidebarToggleIcon.textContent = "◀";
+      if (this.sidebarToggleText) this.sidebarToggleText.textContent = "パネルを隠す";
+      if (this.btnToggleSidebar) this.btnToggleSidebar.classList.remove("active");
+      if (this.btnHeaderToggleSidebar) this.btnHeaderToggleSidebar.classList.remove("active");
+    }
+    try {
+      localStorage.setItem("grid_visualizer_sidebar_collapsed", collapsed ? "true" : "false");
+    } catch (err) {}
   }
 
   showToast(message) {

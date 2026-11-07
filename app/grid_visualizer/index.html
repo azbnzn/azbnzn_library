@@ -11,6 +11,9 @@
   <!-- ヘッダー -->
   <header>
     <div class="logo-area">
+      <button id="btn-header-toggle-sidebar" class="sidebar-header-toggle-btn" title="サイドバーを開閉 (Ctrl+B / ⌘B)">
+        ☰
+      </button>
       <div class="logo-icon">▦</div>
       <div>
         <h1>Grid Visualizer</h1>
@@ -25,10 +28,18 @@
   </header>
 
   <!-- メインコンテンツ -->
-  <div class="app-container">
+  <div class="app-container" id="app-container">
 
     <!-- サイドバー (操作パネル) -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
+
+      <!-- サイドバー上部ヘッダー (折りたたみボタン) -->
+      <div class="sidebar-header">
+        <span class="sidebar-header-title">操作パネル</span>
+        <button id="btn-close-sidebar" class="sidebar-close-btn" title="サイドバーを閉じる (Ctrl+B / ⌘B)">
+          ◀ 閉じる
+        </button>
+      </div>
 
       <!-- 1. グリッドサイズ設定 -->
       <div class="control-section">
@@ -144,9 +155,18 @@
     <!-- ワークスペース (グリッド領域) -->
     <main class="workspace">
 
+      <!-- 折りたたみ時の展開フローティングボタン -->
+      <button id="btn-floating-expand" class="floating-sidebar-toggle" title="サイドバーを開く (Ctrl+B / ⌘B)">
+        ▶ パネルを開く
+      </button>
+
       <!-- ツールバー -->
       <div class="workspace-toolbar">
         <div class="toolbar-group">
+          <button id="btn-toggle-sidebar" class="btn btn-secondary sidebar-toggle-btn" title="サイドバーを開閉 (Ctrl+B / ⌘B)">
+            <span id="sidebar-toggle-icon">◀</span>
+            <span id="sidebar-toggle-text">パネルを隠す</span>
+          </button>
           <button id="btn-undo" class="btn btn-secondary" title="元に戻す (Ctrl+Z)">↩ 元に戻す</button>
           <button id="btn-redo" class="btn btn-secondary" title="やり直す (Ctrl+Y)">↪ やり直す</button>
         </div>
