@@ -52,17 +52,6 @@
         </div>
 
         <div class="toolbar-group">
-          <label class="control-label">サンプル:</label>
-          <select id="select-sample-code" class="select-box">
-            <option value="">-- サンプルを選択 --</option>
-            <option value="sample_oob">配列外参照 (Buffer Overflow)</option>
-            <option value="sample_div0">0除算 (Division by Zero)</option>
-            <option value="sample_overflow">整数オーバーフロー (Integer Overflow)</option>
-            <option value="sample_loop">無限ループ (Infinite Loop TLE)</option>
-            <option value="sample_trace">トレース可視化 (icecream)</option>
-            <option value="sample_acl">ACL UnionFind</option>
-          </select>
-
           <label class="control-label">ファイル:</label>
           <button id="btn-load-file" class="btn btn-sm btn-outline">📂 開く</button>
           <input type="file" id="file-input-cpp" accept=".cpp,.cc,.cxx,.hpp" style="display: none;">
@@ -266,9 +255,6 @@
           </button>
           <button id="btn-stop-stress" class="btn btn-outline" disabled title="実行中のストレステストを中止">
             ⏹ 中止
-          </button>
-          <button id="btn-load-stress-sample" class="btn btn-secondary">
-            📋 サンプル設定読込
           </button>
         </div>
 

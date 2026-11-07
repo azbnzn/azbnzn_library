@@ -18,7 +18,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectMode = document.getElementById("select-mode");
   const selectTimeout = document.getElementById("select-timeout");
   const checkSanitizeSolver = document.getElementById("check-sanitize-solver");
-  const selectPreset = document.getElementById("select-preset");
   const btnToggleCodes = document.getElementById("btn-toggle-codes");
   const mainSplit = document.querySelector(".main-split");
 
@@ -72,146 +71,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectedFailure = null;
   let minimalFailure = null;
   let isRunning = false;
-
-  // Preset Samples
-  const PRESETS = {
-    preset_sum: {
-      solver: `#include <iostream>
-#include <vector>
-
-int main() {
-    int n;
-    if (!(std::cin >> n)) return 0;
-    std::vector<int> a(n);
-    for (int i = 0; i < n; ++i) std::cin >> a[i];
-
-    // 検証解 (バグあり): a[i] == 3 のときに足し忘れる
-    long long ans = 0;
-    for (int i = 0; i < n; ++i) {
-        if (a[i] == 3) continue; // バグ！
-        ans += a[i];
-    }
-
-    std::cout << ans << std::endl;
-    return 0;
-}
-`,
-      naive: `#include <iostream>
-#include <vector>
-
-int main() {
-    int n;
-    if (!(std::cin >> n)) return 0;
-    std::vector<int> a(n);
-    for (int i = 0; i < n; ++i) std::cin >> a[i];
-
-    long long ans = 0;
-    for (int x : a) ans += x;
-
-    std::cout << ans << std::endl;
-    return 0;
-}
-`,
-      gen: `#include <iostream>
-#include <random>
-
-int main() {
-    std::random_device rd;
-    std::mt19937 mt(rd());
-    std::uniform_int_distribution<int> dist_n(1, 6);
-    std::uniform_int_distribution<int> dist_val(1, 5);
-
-    int n = dist_n(mt);
-    std::cout << n << "\\n";
-    for (int i = 0; i < n; ++i) {
-        std::cout << dist_val(mt) << (i + 1 == n ? "" : " ");
-    }
-    std::cout << "\\n";
-    return 0;
-}
-`
-    },
-    preset_modulo: {
-      solver: `#include <iostream>
-
-int main() {
-    long long a, b;
-    if (!(std::cin >> a >> b)) return 0;
-    const long long MOD = 1000000007;
-
-    // バグ: 負の数に対する % 計算で負の余りが残る
-    long long diff = (a - b) % MOD;
-    std::cout << diff << std::endl;
-    return 0;
-}
-`,
-      naive: `#include <iostream>
-
-int main() {
-    long long a, b;
-    if (!(std::cin >> a >> b)) return 0;
-    const long long MOD = 1000000007;
-
-    long long diff = ((a - b) % MOD + MOD) % MOD;
-    std::cout << diff << std::endl;
-    return 0;
-}
-`,
-      gen: `#include <iostream>
-#include <random>
-
-int main() {
-    std::random_device rd;
-    std::mt19937 mt(rd());
-    std::uniform_int_distribution<long long> dist(1, 10000);
-    std::cout << dist(mt) << " " << dist(mt) << std::endl;
-    return 0;
-}
-`
-    },
-    preset_tle: {
-      solver: `#include <iostream>
-
-int main() {
-    int n;
-    if (!(std::cin >> n)) return 0;
-
-    int i = 0;
-    long long sum = 0;
-    while (i < n) {
-        sum += i;
-        // バグ: n が 4 の倍数のときインクリメントを忘れて無限ループ
-        if (n % 4 != 0) i++;
-    }
-
-    std::cout << sum << std::endl;
-    return 0;
-}
-`,
-      naive: `#include <iostream>
-
-int main() {
-    int n;
-    if (!(std::cin >> n)) return 0;
-    long long sum = 0;
-    for (int i = 0; i < n; ++i) sum += i;
-    std::cout << sum << std::endl;
-    return 0;
-}
-`,
-      gen: `#include <iostream>
-#include <random>
-
-int main() {
-    std::random_device rd;
-    std::mt19937 mt(rd());
-    std::uniform_int_distribution<int> dist(1, 10);
-    std::cout << dist(mt) << std::endl;
-    return 0;
-}
-`
-    }
-  };
 
   // 1. Fetch System Info (CPU Cores)
   fetch("/api/system_info")
@@ -347,18 +206,6 @@ int main() {
       }
     } catch (e) {
       alert("tools/ への保存に失敗しました。");
-    }
-  });
-
-  // 4. Presets Selection
-  selectPreset.addEventListener("change", () => {
-    const val = selectPreset.value;
-    if (val && PRESETS[val]) {
-      const p = PRESETS[val];
-      codeSolver.value = p.solver;
-      codeNaive.value = p.naive;
-      codeGen.value = p.gen;
-      selectPreset.value = "";
     }
   });
 
@@ -621,11 +468,10 @@ int main() {
       .replace(/'/g, "&#039;");
   }
 
-  // Load default preset on startup
-  const def = PRESETS.preset_sum;
-  codeSolver.value = def.solver;
-  codeNaive.value = def.naive;
-  codeGen.value = def.gen;
+  // Initial values (empty)
+  codeSolver.value = "";
+  codeNaive.value = "";
+  codeGen.value = "";
 
   // Restore drafts and panel state from localStorage
   try {

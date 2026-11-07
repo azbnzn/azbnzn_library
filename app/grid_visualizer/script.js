@@ -95,7 +95,6 @@ class GridVisualizer {
     this.fileDropZone = document.getElementById("file-drop-zone");
     this.fileInput = document.getElementById("file-input");
     this.modalTextarea = document.getElementById("modal-textarea");
-    this.btnInsertSample = document.getElementById("btn-insert-sample");
     this.btnModalCancel = document.getElementById("btn-modal-cancel");
     this.modalConfirmBtn = document.getElementById("modal-confirm-btn");
   }
@@ -256,9 +255,6 @@ class GridVisualizer {
     this.tabModeString.addEventListener("click", () => this.setReaderMode("string"));
     this.tabModeNumber.addEventListener("click", () => this.setReaderMode("number"));
 
-    // サンプル挿入ボタン
-    this.btnInsertSample.addEventListener("click", () => this.insertSample());
-
     // 反映ボタン
     this.modalConfirmBtn.addEventListener("click", () => this.confirmModalImport());
 
@@ -320,15 +316,6 @@ class GridVisualizer {
       `;
       this.modalTextarea.placeholder = "例:\n4 4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16";
     }
-  }
-
-  insertSample() {
-    if (this.readerMode === "string") {
-      this.modalTextarea.value = "5 7\n.......\n.###.#.\n...#.#.\n.#.###.\n.#.....";
-    } else {
-      this.modalTextarea.value = "4 4\n1 2 3 4\n5 6 7 8\n9 10 11 12\n13 14 15 16";
-    }
-    this.showToast("サンプル入力を挿入しました");
   }
 
   loadFile(file) {

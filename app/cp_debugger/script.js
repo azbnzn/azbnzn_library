@@ -22,7 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnLoadFile = document.getElementById("btn-load-file");
   const fileInputCpp = document.getElementById("file-input-cpp");
   const btnSaveFile = document.getElementById("btn-save-file");
-  const selectSampleCode = document.getElementById("select-sample-code");
   const selectTimeout = document.getElementById("select-timeout");
   const checkSanitize = document.getElementById("check-sanitize");
   const btnToggleInspector = document.getElementById("btn-toggle-inspector");
@@ -75,7 +74,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // DOM Elements - Stress Test
   const btnStartStress = document.getElementById("btn-start-stress");
   const btnStopStress = document.getElementById("btn-stop-stress");
-  const btnLoadStressSample = document.getElementById("btn-load-stress-sample");
   const selectStressIters = document.getElementById("select-stress-iters");
   const selectStressTimeout = document.getElementById("select-stress-timeout");
   const checkStressStopFail = document.getElementById("check-stress-stop-fail");
@@ -100,137 +98,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let isRunningStress = false;
 
   const LINE_HEIGHT_PX = 23; // Matches CSS line-height
-
-  // ==========================================================================
-  // Sample Code Presets
-  // ==========================================================================
-  const SAMPLE_CODES = {
-    sample_oob: {
-      code: `#include <iostream>
-#include <vector>
-
-int main() {
-    int n;
-    if (!(std::cin >> n)) n = 5;
-    std::vector<int> a(n);
-    for (int i = 0; i < n; ++i) a[i] = (i + 1) * 10;
-
-    // バグ: 1-indexed でループして配列外参照
-    long long sum = 0;
-    for (int i = 1; i <= n; ++i) {
-        sum += a[i]; // i = n のときに境界外アクセス
-    }
-
-    std::cout << "Sum: " << sum << std::endl;
-    return 0;
-}
-`,
-      input: "5\n",
-      expected: "Sum: 150\n"
-    },
-    sample_div0: {
-      code: `#include <iostream>
-#include <vector>
-
-int main() {
-    int total = 100;
-    int count = 0; // 条件により 0 のまま残ったケース
-
-    // バグ: 0除算
-    int average = total / count;
-
-    std::cout << "Average: " << average << std::endl;
-    return 0;
-}
-`,
-      input: "",
-      expected: ""
-    },
-    sample_overflow: {
-      code: `#include <iostream>
-
-int main() {
-    // バグ: int (32bit) での累積積計算によるオーバーフロー
-    int product = 1;
-    for (int i = 1; i <= 15; ++i) {
-        product *= i;
-    }
-
-    std::cout << "15! = " << product << std::endl;
-    return 0;
-}
-`,
-      input: "",
-      expected: ""
-    },
-    sample_loop: {
-      code: `#include <iostream>
-#include <vector>
-
-void solve() {
-    int n = 5;
-    int i = 0;
-    long long total = 0;
-
-    // バグ: i のインクリメントを忘れて無限ループ
-    while (i < n) {
-        total += i * 10;
-        // i++; を書き忘れている！
-    }
-
-    std::cout << "Total: " << total << std::endl;
-}
-
-int main() {
-    solve();
-    return 0;
-}
-`,
-      input: "",
-      expected: "Total: 100\n"
-    },
-    sample_trace: {
-      code: `#include <iostream>
-#include <vector>
-#include <mylib/icecream.hpp>
-
-int main() {
-    IC_CONFIG.include_context(true);
-
-    int n = 5;
-    std::vector<int> dp(n + 1, 0);
-    dp[0] = 1;
-
-    for (int i = 1; i <= n; ++i) {
-        dp[i] = dp[i - 1] * 2;
-        IC(i, dp[i]); // icecream で途中経過をトレース
-    }
-
-    std::cout << dp[n] << std::endl;
-    return 0;
-}
-`,
-      input: "",
-      expected: "32\n"
-    },
-    sample_acl: {
-      code: `#include <iostream>
-#include <atcoder/all>
-
-int main() {
-    atcoder::dsu d(5);
-    d.merge(0, 1);
-    d.merge(1, 2);
-
-    std::cout << (d.same(0, 2) ? "Yes" : "No") << std::endl;
-    std::cout << (d.same(0, 3) ? "Yes" : "No") << std::endl;
-    return 0;
-}
-`,
-      input: "",
-      expected: "Yes\nNo\n"
-    }
-  };
 
   // ==========================================================================
   // Editor Management (Gutter & Line Numbers)
@@ -366,22 +233,8 @@ int main() {
   });
 
   // ==========================================================================
-  // Sample Code & File Loading
+  // File Loading & Saving
   // ==========================================================================
-  selectSampleCode.addEventListener("change", () => {
-    const val = selectSampleCode.value;
-    if (val && SAMPLE_CODES[val]) {
-      const sample = SAMPLE_CODES[val];
-      codeEditor.value = sample.code;
-      inputStdin.value = sample.input;
-      inputExpected.value = sample.expected;
-      clearDiagnosis();
-      updateGutter();
-      updateCursorPos();
-      selectSampleCode.value = "";
-    }
-  });
-
   btnLoadFile.addEventListener("click", () => fileInputCpp.click());
   fileInputCpp.addEventListener("change", (e) => {
     const file = e.target.files[0];
@@ -731,74 +584,6 @@ int main() {
   // ==========================================================================
   // Tab 2: Stress Test Studio
   // ==========================================================================
-  const STRESS_SAMPLE = {
-    solver: `#include <iostream>
-#include <vector>
-
-int main() {
-    int n;
-    if (!(std::cin >> n)) return 0;
-    std::vector<int> a(n);
-    for (int i = 0; i < n; ++i) std::cin >> a[i];
-
-    // 検証解 (バグあり): a[i] == 3 のときに足し忘れる
-    long long ans = 0;
-    for (int i = 0; i < n; ++i) {
-        if (a[i] == 3) continue; // バグ！
-        ans += a[i];
-    }
-
-    std::cout << ans << std::endl;
-    return 0;
-}
-`,
-    naive: `#include <iostream>
-#include <vector>
-
-int main() {
-    int n;
-    if (!(std::cin >> n)) return 0;
-    std::vector<int> a(n);
-    for (int i = 0; i < n; ++i) std::cin >> a[i];
-
-    // 愚直解 (正解保証): 単純な総和
-    long long ans = 0;
-    for (int x : a) ans += x;
-
-    std::cout << ans << std::endl;
-    return 0;
-}
-`,
-    gen: `#include <iostream>
-#include <random>
-
-int main() {
-    std::random_device rd;
-    std::mt19937 mt(rd());
-    std::uniform_int_distribution<int> dist_n(1, 6);
-    std::uniform_int_distribution<int> dist_val(1, 5);
-
-    int n = dist_n(mt);
-    std::cout << n << "\\n";
-    for (int i = 0; i < n; ++i) {
-        std::cout << dist_val(mt) << (i + 1 == n ? "" : " ");
-    }
-    std::cout << "\\n";
-    return 0;
-}
-`
-  };
-
-  btnLoadStressSample.addEventListener("click", () => {
-    stressCodeSolver.value = STRESS_SAMPLE.solver;
-    stressCodeNaive.value = STRESS_SAMPLE.naive;
-    stressCodeGen.value = STRESS_SAMPLE.gen;
-    stressFailCard.style.display = "none";
-    stressProgressBar.style.width = "0%";
-    stressStatusText.textContent = "サンプルコードを読み込みました。「ストレステスト開始」を押してください。";
-    stressPassedCount.textContent = "0 / 0 完了";
-  });
-
   btnSyncFromDebugger.addEventListener("click", () => {
     stressCodeSolver.value = codeEditor.value;
     btnSyncFromDebugger.textContent = "反映完了";
@@ -915,34 +700,13 @@ int main() {
       .replace(/'/g, "&#039;");
   }
 
-  // Initial code template
-  codeEditor.value = `#include <iostream>
-#include <vector>
-#include <algorithm>
-
-using namespace std;
-
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-
-    int n;
-    if (!(cin >> n)) return 0;
-
-    vector<int> a(n);
-    for (int i = 0; i < n; ++i) {
-        cin >> a[i];
-    }
-
-    long long ans = 0;
-    for (int x : a) ans += x;
-
-    cout << ans << "\\n";
-    return 0;
-}
-`;
-  inputStdin.value = "3\n10 20 30\n";
-  inputExpected.value = "60\n";
+  // Initial values
+  codeEditor.value = "";
+  inputStdin.value = "";
+  inputExpected.value = "";
+  stressCodeSolver.value = "";
+  stressCodeNaive.value = "";
+  stressCodeGen.value = "";
 
   // Restore drafts from localStorage if available
   try {
@@ -968,11 +732,6 @@ int main() {
       switchInspectorTab(savedTab);
     }
   } catch (e) {}
-
-  // Initialize Stress Test with sample
-  stressCodeSolver.value = STRESS_SAMPLE.solver;
-  stressCodeNaive.value = STRESS_SAMPLE.naive;
-  stressCodeGen.value = STRESS_SAMPLE.gen;
 
   updateGutter();
   updateCursorPos();

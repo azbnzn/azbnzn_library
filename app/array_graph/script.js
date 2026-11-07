@@ -34,9 +34,7 @@ class ArrayGraphVisualizer {
     this.initDOM();
     this.initEvents();
     this.resizeCanvas();
-
-    // デフォルトで非負数列サンプルをプロット
-    this.loadPreset("nonneg");
+    this.emptyState.style.display = "flex";
 
     // 保存されていたサイドバー状態の復元
     try {
@@ -144,14 +142,6 @@ class ArrayGraphVisualizer {
       this.updateStats();
       this.emptyState.style.display = "flex";
       this.clearCanvas();
-    });
-
-    // プリセットボタン
-    document.querySelectorAll(".preset-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const preset = e.currentTarget.dataset.preset;
-        this.loadPreset(preset);
-      });
     });
 
     // グラフ種別トグル
@@ -323,32 +313,6 @@ class ArrayGraphVisualizer {
       alert("ファイルの読み込みに失敗しました。");
     };
     reader.readAsText(file);
-  }
-
-  loadPreset(type) {
-    let sample = "";
-    if (type === "nonneg") {
-      // 非負数列 (典型例)
-      sample = "10\n3 7 2 5 8 1 4 9 6 8";
-    } else if (type === "negative") {
-      // 負数を含む (株価DP / 利益変動)
-      sample = "12\n10 5 -3 -8 -4 2 12 18 9 -2 6 15";
-    } else if (type === "convex") {
-      // 下凸 (三分探索 / 傾き変化)
-      sample = "11\n25 16 9 4 1 0 1 4 9 16 25";
-    } else if (type === "random-walk") {
-      // ランダムウォーク
-      const n = 25;
-      let val = 10;
-      const vals = [val];
-      for (let i = 1; i < n; i++) {
-        val += Math.floor(Math.random() * 7) - 3;
-        vals.push(val);
-      }
-      sample = `${n}\n${vals.join(" ")}`;
-    }
-    this.inputArea.value = sample;
-    this.plotFromInput();
   }
 
   // 入力テキストからパースしてプロット
