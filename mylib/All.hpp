@@ -15,6 +15,7 @@
 #include "LowestCommonAncestor.hpp"
 #include "Matrix.hpp"
 #include "MosAlgorithm.hpp"
+#include "MultiDimensionalCumulativeSum.hpp"
 #include "NumberTheory.hpp"
 #include "OrderStatisticSet.hpp"
 #include "PersistentSegTree.hpp"
