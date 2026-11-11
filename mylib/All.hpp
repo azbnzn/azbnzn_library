@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BellmanFord.hpp"
 #include "BiCoef.hpp"
 #include "BIT2D.hpp"
 #include "CoordinateCompression.hpp"
