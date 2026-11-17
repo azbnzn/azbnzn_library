@@ -73,6 +73,29 @@ def compile_cpp(source_code, binary_path, opt_level="-O2", sanitize=False):
     return True, None
 
 
+def run_process(cmd, stdin_text=None, timeout_sec=2.0):
+    """Runs a subprocess with optional stdin/timeout and returns (timed_out, exit_code, stdout, stderr, elapsed_ms)."""
+    start_t = time.perf_counter()
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.PIPE if stdin_text is not None else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        out, err = proc.communicate(input=stdin_text, timeout=timeout_sec)
+        elapsed_ms = round((time.perf_counter() - start_t) * 1000, 1)
+        return False, proc.returncode, out, err, elapsed_ms
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            out, err = proc.communicate(timeout=1.0)
+        except Exception:
+            out, err = "", ""
+        return True, None, out, err, round(timeout_sec * 1000, 1)
+
+
 class ParallelStressManager:
     """Manages multi-core parallel stress test runs."""
     def __init__(self):
@@ -81,9 +104,11 @@ class ParallelStressManager:
         self.stop_requested = False
         self.total_target = 1000
         self.completed_count = 0
-        self.counts = {"AC": 0, "WA": 0, "RE": 0, "TLE": 0}
+        self.counts = {"AC": 0, "WA": 0, "RE": 0, "TLE": 0, "ERR": 0}
         self.failures = []
         self.minimal_failure = None
+        self.fatal_error = None
+        self.fatal_failure = None
         self.start_time = 0.0
         self.elapsed_sec = 0.0
         self.speed = 0.0
@@ -126,6 +151,8 @@ class ParallelStressManager:
                 "counts": dict(self.counts),
                 "failures_count": len(self.failures),
                 "minimal_failure": self.minimal_failure,
+                "fatal_error": self.fatal_error,
+                "fatal_failure": self.fatal_failure,
                 "failures": self.failures[:50]  # Return top 50 failures
             }
 
@@ -141,9 +168,11 @@ class ParallelStressManager:
             self.stop_requested = False
             self.total_target = max_cases
             self.completed_count = 0
-            self.counts = {"AC": 0, "WA": 0, "RE": 0, "TLE": 0}
+            self.counts = {"AC": 0, "WA": 0, "RE": 0, "TLE": 0, "ERR": 0}
             self.failures = []
             self.minimal_failure = None
+            self.fatal_error = None
+            self.fatal_failure = None
             self.start_time = time.perf_counter()
             self.elapsed_sec = 0.0
             self.speed = 0.0
@@ -205,60 +234,116 @@ class ParallelStressManager:
                     return None
 
                 # 1. Run Generator
-                try:
-                    cmd_gen = [sys.executable, bin_gen] if is_py_gen else [bin_gen]
-                    p_gen = subprocess.Popen(cmd_gen, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                    gen_out, gen_err = p_gen.communicate(timeout=2.0)
-                    if p_gen.returncode != 0:
-                        return {"id": test_id, "verdict": "GEN_ERR", "error": gen_err}
-                except subprocess.TimeoutExpired:
-                    p_gen.kill()
-                    return {"id": test_id, "verdict": "GEN_ERR", "error": "Generator timed out"}
+                cmd_gen = [sys.executable, bin_gen] if is_py_gen else [bin_gen]
+                gen_tle, gen_code, gen_out, gen_err, gen_ms = run_process(cmd_gen, None, max(2.0, timeout_sec))
+                if gen_tle:
+                    return {
+                        "id": test_id,
+                        "verdict": "GEN_ERR",
+                        "error": gen_err or "Generator timed out",
+                        "input": gen_out,
+                        "naive_status": "SKIPPED",
+                        "solver_status": "SKIPPED",
+                        "time_ms": gen_ms,
+                    }
+                if gen_code != 0:
+                    return {
+                        "id": test_id,
+                        "verdict": "GEN_ERR",
+                        "error": gen_err or f"Generator exited with code {gen_code}",
+                        "input": gen_out,
+                        "exit_code": gen_code,
+                        "naive_status": "SKIPPED",
+                        "solver_status": "SKIPPED",
+                        "time_ms": gen_ms,
+                    }
 
                 test_input = gen_out
 
                 # 2. Run Naive (Expected)
-                try:
-                    cmd_naive = [sys.executable, bin_naive] if is_py_naive else [bin_naive]
-                    p_naive = subprocess.Popen(cmd_naive, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                    naive_out, naive_err = p_naive.communicate(input=test_input, timeout=timeout_sec)
-                    if p_naive.returncode != 0:
-                        return {"id": test_id, "verdict": "NAIVE_ERR", "error": naive_err, "input": test_input}
-                except subprocess.TimeoutExpired:
-                    p_naive.kill()
-                    return {"id": test_id, "verdict": "NAIVE_TLE", "error": "Naive timed out", "input": test_input}
+                cmd_naive = [sys.executable, bin_naive] if is_py_naive else [bin_naive]
+                naive_tle, naive_code, naive_out, naive_err, naive_ms = run_process(cmd_naive, test_input, timeout_sec)
+                if naive_tle:
+                    naive_status = "TLE"
+                elif naive_code != 0:
+                    naive_status = "RE"
+                else:
+                    naive_status = "OK"
 
-                # 3. Run Solver
-                start_sol = time.perf_counter()
-                try:
-                    cmd_solver = [sys.executable, bin_solver] if is_py_solver else [bin_solver]
-                    p_sol = subprocess.Popen(cmd_solver, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                    sol_out, sol_err = p_sol.communicate(input=test_input, timeout=timeout_sec)
-                    sol_time_ms = round((time.perf_counter() - start_sol) * 1000, 1)
-                    sol_exit = p_sol.returncode
-                except subprocess.TimeoutExpired:
-                    p_sol.kill()
+                # 3. Run Solver (Always run even when Naive failed so both failures can be reported)
+                cmd_solver = [sys.executable, bin_solver] if is_py_solver else [bin_solver]
+                sol_tle, sol_code, sol_out, sol_err, sol_ms = run_process(cmd_solver, test_input, timeout_sec)
+                if sol_tle:
+                    solver_status = "TLE"
+                elif sol_code != 0:
+                    solver_status = "RE"
+                else:
+                    solver_status = "OK"
+
+                # Determine verdict (surface Naive errors without hiding Solver failures)
+                if naive_tle:
+                    return {
+                        "id": test_id,
+                        "verdict": "NAIVE_TLE",
+                        "input": test_input,
+                        "error": naive_err or "Naive timed out",
+                        "naive_status": naive_status,
+                        "naive_out": naive_out,
+                        "naive_err": naive_err or "Time Limit Exceeded",
+                        "naive_time_ms": naive_ms,
+                        "solver_status": solver_status,
+                        "solver_out": sol_out,
+                        "solver_err": "Time Limit Exceeded" if sol_tle else sol_err,
+                        "solver_exit_code": sol_code,
+                        "time_ms": sol_ms,
+                    }
+
+                if naive_code != 0:
+                    return {
+                        "id": test_id,
+                        "verdict": "NAIVE_ERR",
+                        "input": test_input,
+                        "error": naive_err or f"Naive exited with code {naive_code}",
+                        "naive_status": naive_status,
+                        "naive_exit_code": naive_code,
+                        "naive_out": naive_out,
+                        "naive_err": naive_err,
+                        "naive_time_ms": naive_ms,
+                        "solver_status": solver_status,
+                        "solver_out": sol_out,
+                        "solver_err": "Time Limit Exceeded" if sol_tle else sol_err,
+                        "solver_exit_code": sol_code,
+                        "time_ms": sol_ms,
+                    }
+
+                if sol_tle:
                     return {
                         "id": test_id,
                         "verdict": "TLE",
                         "input": test_input,
+                        "naive_status": naive_status,
                         "naive_out": naive_out,
-                        "solver_out": "",
+                        "naive_err": naive_err,
+                        "solver_status": "TLE",
+                        "solver_out": sol_out,
                         "solver_err": "Time Limit Exceeded",
-                        "time_ms": int(timeout_sec * 1000)
+                        "time_ms": sol_ms,
                     }
 
-                # Check RE
-                if sol_exit != 0:
+                if sol_code != 0:
                     return {
                         "id": test_id,
                         "verdict": "RE",
                         "input": test_input,
+                        "naive_status": naive_status,
                         "naive_out": naive_out,
+                        "naive_err": naive_err,
+                        "solver_status": "RE",
                         "solver_out": sol_out,
                         "solver_err": sol_err,
-                        "time_ms": sol_time_ms,
-                        "exit_code": sol_exit
+                        "time_ms": sol_ms,
+                        "exit_code": sol_code,
+                        "solver_exit_code": sol_code,
                     }
 
                 # Compare outputs
@@ -267,13 +352,16 @@ class ParallelStressManager:
                         "id": test_id,
                         "verdict": "WA",
                         "input": test_input,
+                        "naive_status": naive_status,
                         "naive_out": naive_out,
+                        "naive_err": naive_err,
+                        "solver_status": "WA",
                         "solver_out": sol_out,
                         "solver_err": sol_err,
-                        "time_ms": sol_time_ms
+                        "time_ms": sol_ms,
                     }
 
-                return {"id": test_id, "verdict": "AC", "time_ms": sol_time_ms}
+                return {"id": test_id, "verdict": "AC", "time_ms": sol_ms}
 
             # Batch execution loop with ThreadPoolExecutor
             last_broadcast = 0.0
@@ -302,27 +390,51 @@ class ParallelStressManager:
                         v = res.get("verdict")
                         with self.lock:
                             self.completed_count += 1
-                            if v in self.counts:
+                            if v in ("GEN_ERR", "NAIVE_ERR", "NAIVE_TLE"):
+                                self.counts["ERR"] += 1
+                            elif v in self.counts:
                                 self.counts[v] += 1
 
-                            if v in ["WA", "RE", "TLE"]:
+                            if v in ["WA", "RE", "TLE", "GEN_ERR", "NAIVE_ERR", "NAIVE_TLE"]:
                                 fail_obj = {
                                     "id": res["id"],
                                     "verdict": v,
-                                    "input": res["input"],
+                                    "input": res.get("input", ""),
+                                    "error": res.get("error", ""),
+                                    "naive_status": res.get("naive_status", "OK"),
+                                    "naive_exit_code": res.get("naive_exit_code"),
                                     "naive_out": res.get("naive_out", ""),
+                                    "naive_err": res.get("naive_err", ""),
+                                    "solver_status": res.get("solver_status", v),
+                                    "solver_exit_code": res.get("solver_exit_code", res.get("exit_code")),
                                     "solver_out": res.get("solver_out", ""),
                                     "solver_err": res.get("solver_err", ""),
                                     "time_ms": res.get("time_ms", 0),
-                                    "size": len(res["input"])
+                                    "size": len(res.get("input", ""))
                                 }
                                 self.failures.append(fail_obj)
 
-                                # Update minimal failure (smallest input to debug)
-                                if (self.minimal_failure is None) or (fail_obj["size"] < self.minimal_failure["size"]):
-                                    self.minimal_failure = fail_obj
+                                if v in ["WA", "RE", "TLE"]:
+                                    # Update minimal failure (smallest input to debug)
+                                    if (self.minimal_failure is None) or (fail_obj["size"] < self.minimal_failure["size"]):
+                                        self.minimal_failure = fail_obj
 
-                                if mode == "stop":
+                                    if mode == "stop":
+                                        self.stop_requested = True
+                                        break
+                                else:
+                                    # GEN_ERR / NAIVE_ERR / NAIVE_TLE はモードに関わらず即時停止して通知
+                                    if self.fatal_error is None:
+                                        sol_st = fail_obj["solver_status"]
+                                        both_note = f"（Solver も {sol_st}）" if sol_st in ("RE", "TLE") else ""
+                                        self.fatal_error = {
+                                            "id": res["id"],
+                                            "verdict": v,
+                                            "solver_status": sol_st,
+                                            "message": f"ケース #{res['id']} で {v}{both_note} が発生したため即時停止しました。",
+                                            "detail": (res.get("error") or "").strip()[:300],
+                                        }
+                                        self.fatal_failure = fail_obj
                                     self.stop_requested = True
                                     break
 

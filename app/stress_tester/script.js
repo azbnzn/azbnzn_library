@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const pillWa = document.getElementById("pill-wa");
   const pillRe = document.getElementById("pill-re");
   const pillTle = document.getElementById("pill-tle");
+  const pillErr = document.getElementById("pill-err");
   const metricFailSummary = document.getElementById("metric-fail-summary");
 
   // DOM Elements - Code Editors
@@ -45,6 +46,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCopyGen = document.getElementById("btn-copy-gen");
 
   // DOM Elements - Inspector & Failures
+  const fatalErrorBanner = document.getElementById("fatal-error-banner");
+  const fatalBannerTitle = document.getElementById("fatal-banner-title");
+  const fatalMetaText = document.getElementById("fatal-meta-text");
+  const btnLoadFatal = document.getElementById("btn-load-fatal");
   const minimalCaseBanner = document.getElementById("minimal-case-banner");
   const minimalMetaText = document.getElementById("minimal-meta-text");
   const btnLoadMinimal = document.getElementById("btn-load-minimal");
@@ -58,7 +63,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const detailCaseTitle = document.getElementById("detail-case-title");
   const btnTransferCpDebug = document.getElementById("btn-transfer-cp-debug");
   const detailInputPre = document.getElementById("detail-input-pre");
+  const detailNaiveLabel = document.getElementById("detail-naive-label");
+  const detailNaiveStatus = document.getElementById("detail-naive-status");
   const detailNaivePre = document.getElementById("detail-naive-pre");
+  const detailSolverLabel = document.getElementById("detail-solver-label");
+  const detailSolverStatus = document.getElementById("detail-solver-status");
   const detailSolverPre = document.getElementById("detail-solver-pre");
   const btnCopyFailInput = document.getElementById("btn-copy-fail-input");
   const btnCopyFailNaive = document.getElementById("btn-copy-fail-naive");
@@ -70,6 +79,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentFilter = "ALL";
   let selectedFailure = null;
   let minimalFailure = null;
+  let fatalFailure = null;
+  let hasFatalError = false;
+  let autoSelectedFatal = false;
   let isRunning = false;
 
   // 1. Fetch System Info (CPU Cores)
@@ -235,8 +247,17 @@ document.addEventListener("DOMContentLoaded", () => {
     // Reset UI
     allFailures = [];
     minimalFailure = null;
+    fatalFailure = null;
+    hasFatalError = false;
+    autoSelectedFatal = false;
     selectedFailure = null;
     failureCount.textContent = "0";
+    if (pillAc) pillAc.textContent = "AC: 0";
+    if (pillWa) pillWa.textContent = "WA: 0";
+    if (pillRe) pillRe.textContent = "RE: 0";
+    if (pillTle) pillTle.textContent = "TLE: 0";
+    if (pillErr) pillErr.textContent = "ERR: 0";
+    if (fatalErrorBanner) fatalErrorBanner.style.display = "none";
     minimalCaseBanner.style.display = "none";
     failureDetailSection.style.display = "none";
     failureTbody.innerHTML = `<tr><td colspan="5" class="empty-cell">テスト実行中...</td></tr>`;
@@ -315,7 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const { completed, total, elapsed, speed, active_workers, counts, failures, minimal_failure, is_running } = data;
+    const { completed, total, elapsed, speed, active_workers, counts, failures, minimal_failure, fatal_error, fatal_failure, is_running } = data;
 
     // Update Speedometer & Workers
     metricSpeed.textContent = Math.round(speed || 0);
@@ -333,17 +354,41 @@ document.addEventListener("DOMContentLoaded", () => {
       pillWa.textContent = `WA: ${counts.WA || 0}`;
       pillRe.textContent = `RE: ${counts.RE || 0}`;
       pillTle.textContent = `TLE: ${counts.TLE || 0}`;
+      if (pillErr) pillErr.textContent = `ERR: ${counts.ERR || 0}`;
+    }
+
+    // Update Fatal Error (GEN_ERR / NAIVE_ERR / NAIVE_TLE)
+    if (fatal_error) {
+      hasFatalError = true;
+      if (fatalErrorBanner) {
+        fatalErrorBanner.style.display = "flex";
+        fatalBannerTitle.textContent = fatal_error.message || `${fatal_error.verdict} が発生したため即時停止しました`;
+        fatalMetaText.textContent = fatal_error.detail || "(エラー詳細なし)";
+      }
+      progressBarFill.style.background = "linear-gradient(90deg, #ef4444, #f97316)";
+      metricFailSummary.textContent = `🚨 ${fatal_error.verdict} 発生により即停止`;
     }
 
     // Update Failures List
     if (failures) {
-      allFailures = failures;
+      allFailures = failures.slice();
+      if (fatal_failure && !allFailures.some(x => x.id === fatal_failure.id)) {
+        allFailures.unshift(fatal_failure);
+      }
       failureCount.textContent = allFailures.length;
       renderFailuresTable();
 
-      if (allFailures.length > 0) {
+      if (!fatal_error && allFailures.length > 0) {
         progressBarFill.style.background = "linear-gradient(90deg, #f59e0b, #ef4444)";
         metricFailSummary.textContent = `🚨 ${allFailures.length} 件の不一致を検出！`;
+      }
+    }
+
+    if (fatal_failure) {
+      fatalFailure = fatal_failure;
+      if (!autoSelectedFatal && !selectedFailure) {
+        autoSelectedFatal = true;
+        selectFailure(fatal_failure);
       }
     }
 
@@ -357,7 +402,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Finished
     if (data.type === "finished" || is_running === false) {
       finishRun();
-      if (allFailures.length === 0) {
+      if (fatal_error || hasFatalError) {
+        metricStatusMsg.textContent = `⛔️ ${fatal_error ? fatal_error.message : "Generator / Naive のエラーにより即時停止しました"}`;
+      } else if (allFailures.length === 0) {
         metricStatusMsg.textContent = `🎉 全 ${completed} ケースに合格！バグは検出されませんでした。`;
         metricFailSummary.textContent = "全ケース合格";
       } else {
@@ -386,7 +433,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function renderFailuresTable() {
-    const filtered = allFailures.filter(f => currentFilter === "ALL" || f.verdict === currentFilter);
+    const filtered = allFailures.filter(f => {
+      if (currentFilter === "ALL") return true;
+      if (currentFilter === "INFRA_ERR") {
+        return f.verdict === "GEN_ERR" || f.verdict === "NAIVE_ERR" || f.verdict === "NAIVE_TLE";
+      }
+      return f.verdict === currentFilter;
+    });
 
     if (filtered.length === 0) {
       failureTbody.innerHTML = `<tr><td colspan="5" class="empty-cell">${allFailures.length === 0 ? "失敗ケースは検出されていません。" : "フィルターに一致するケースはありません。"}</td></tr>`;
@@ -399,14 +452,29 @@ document.addEventListener("DOMContentLoaded", () => {
       const isMin = minimalFailure && minimalFailure.id === f.id;
       const badgeCls = `badge-${f.verdict.toLowerCase()}`;
       const minTag = isMin ? '<span style="color:#fbbf24; margin-left:4px;" title="最小入力ケース">🏆</span>' : "";
+      const isInfra = f.verdict === "GEN_ERR" || f.verdict === "NAIVE_ERR" || f.verdict === "NAIVE_TLE";
+      const solverAlsoTag = (isInfra && f.solver_status && (f.solver_status === "RE" || f.solver_status === "TLE"))
+        ? `<span class="sub-verdict-tag" title="Solver も ${escapeHtml(f.solver_status)} になりました">+Solver ${escapeHtml(f.solver_status)}</span>`
+        : "";
+
+      let summaryText = "";
+      if (f.verdict === "GEN_ERR") {
+        summaryText = `[Generator異常] ${(f.error || "(エラー詳細なし)").replace(/\n/g, " ").substring(0, 40)}`;
+      } else if (f.verdict === "NAIVE_ERR" || f.verdict === "NAIVE_TLE") {
+        const solDesc = f.solver_status && f.solver_status !== "SKIPPED" ? `Solver:${f.solver_status}` : "";
+        const errSnippet = (f.error || f.input || "").replace(/\n/g, " ").substring(0, 32);
+        summaryText = `${solDesc ? `[${solDesc}] ` : ""}${errSnippet}`;
+      } else {
+        summaryText = `${(f.input || "").substring(0, 35).replace(/\n/g, " ")}...`;
+      }
 
       html += `
         <tr class="failure-row ${isSel ? 'selected' : ''}" data-id="${f.id}">
           <td>#${f.id}${minTag}</td>
-          <td><span class="${badgeCls}">${f.verdict}</span></td>
+          <td><span class="${badgeCls}">${f.verdict}</span>${solverAlsoTag}</td>
           <td>${f.size} 文字</td>
           <td>${f.time_ms} ms</td>
-          <td>${escapeHtml(f.input.substring(0, 35).replace(/\n/g, " "))}...</td>
+          <td>${escapeHtml(summaryText)}</td>
         </tr>
       `;
     });
@@ -422,6 +490,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function formatOutputAndErr(outStr, errStr, fallbackMsg = "(出力なし)") {
+    const out = outStr || "";
+    const err = errStr || "";
+    if (out && err) return `${out}\n\n[stderr]\n${err}`;
+    if (out) return out;
+    if (err) return `[stderr]\n${err}`;
+    return fallbackMsg;
+  }
+
+  function setStatusTag(el, text, isErr) {
+    if (!el) return;
+    if (!text) {
+      el.style.display = "none";
+      return;
+    }
+    el.style.display = "inline-block";
+    el.textContent = text;
+    el.classList.toggle("err", !!isErr);
+  }
+
   function selectFailure(item) {
     selectedFailure = item;
     renderFailuresTable();
@@ -431,9 +519,45 @@ document.addEventListener("DOMContentLoaded", () => {
     detailVerdictBadge.className = `detail-badge badge-${item.verdict.toLowerCase()}`;
     detailCaseTitle.textContent = `ケース #${item.id} (${item.size}文字 / ${item.time_ms}ms)`;
 
-    detailInputPre.textContent = item.input;
-    detailNaivePre.textContent = item.naive_out || "(出力なし)";
-    detailSolverPre.textContent = item.solver_out || item.solver_err || "(出力なし)";
+    if (item.verdict === "GEN_ERR") {
+      detailInputPre.textContent = item.input || "(Generator からの出力なし)";
+      if (detailNaiveLabel) detailNaiveLabel.textContent = "Generator エラー詳細:";
+      setStatusTag(detailNaiveStatus, item.solver_exit_code !== undefined && item.solver_exit_code !== null ? `exit ${item.solver_exit_code}` : "GEN_ERR", true);
+      detailNaivePre.textContent = item.error || "(エラー出力なし)";
+
+      if (detailSolverLabel) detailSolverLabel.textContent = "検証解の出力 (Solver):";
+      setStatusTag(detailSolverStatus, "未実行", false);
+      detailSolverPre.textContent = "(Generator エラーのため未実行)";
+      return;
+    }
+
+    detailInputPre.textContent = item.input || "(入力なし)";
+
+    // Naive 出力 / 状態
+    if (detailNaiveLabel) detailNaiveLabel.textContent = "愚直解の出力 (Naive):";
+    const nSt = item.naive_status || (item.verdict === "NAIVE_ERR" ? "RE" : item.verdict === "NAIVE_TLE" ? "TLE" : "OK");
+    const nTag = nSt === "RE"
+      ? `RE${item.naive_exit_code != null ? ` (exit ${item.naive_exit_code})` : ""}`
+      : nSt;
+    setStatusTag(detailNaiveStatus, nTag, nSt !== "OK");
+    detailNaivePre.textContent = formatOutputAndErr(item.naive_out, item.naive_err || (nSt !== "OK" ? item.error : ""));
+
+    // Solver 出力 / 状態
+    if (detailSolverLabel) detailSolverLabel.textContent = "検証解の出力 (Solver):";
+    const sSt = item.solver_status || (item.verdict === "WA" || item.verdict === "RE" || item.verdict === "TLE" ? item.verdict : "OK");
+    const sTag = sSt === "RE"
+      ? `RE${item.solver_exit_code != null ? ` (exit ${item.solver_exit_code})` : ""}`
+      : sSt;
+    setStatusTag(detailSolverStatus, sTag, sSt !== "OK");
+    detailSolverPre.textContent = formatOutputAndErr(item.solver_out, item.solver_err);
+  }
+
+  if (btnLoadFatal) {
+    btnLoadFatal.addEventListener("click", () => {
+      if (fatalFailure) {
+        selectFailure(fatalFailure);
+      }
+    });
   }
 
   btnLoadMinimal.addEventListener("click", () => {

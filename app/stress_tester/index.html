@@ -128,6 +128,7 @@
         <span class="count-pill pill-wa" id="pill-wa">WA: 0</span>
         <span class="count-pill pill-re" id="pill-re">RE: 0</span>
         <span class="count-pill pill-tle" id="pill-tle">TLE: 0</span>
+        <span class="count-pill pill-err" id="pill-err" title="Generator / Naive 側のエラー (GEN_ERR / NAIVE_ERR / NAIVE_TLE)">ERR: 0</span>
       </div>
       <div class="metric-sub" id="metric-fail-summary">エラー未検出</div>
     </div>
@@ -180,7 +181,17 @@
 
     <!-- 右ペイン: 失敗ケースインスペクタ -->
     <div class="pane pane-inspector">
-      
+
+      <!-- Generator / Naive エラー即時停止バナー -->
+      <div id="fatal-error-banner" class="fatal-banner" style="display: none;">
+        <div class="fatal-header">
+          <span class="fatal-icon">🚨</span>
+          <span class="fatal-title" id="fatal-banner-title">Generator / Naive でエラーが発生したため即時停止しました</span>
+          <button id="btn-load-fatal" class="btn btn-sm btn-danger">詳細を表示</button>
+        </div>
+        <div class="fatal-meta" id="fatal-meta-text">-</div>
+      </div>
+
       <!-- 最小ケース通知バナー (見つかった場合) -->
       <div id="minimal-case-banner" class="minimal-banner" style="display: none;">
         <div class="minimal-header">
@@ -200,6 +211,7 @@
             <button class="filter-btn" data-filter="WA">WA</button>
             <button class="filter-btn" data-filter="RE">RE</button>
             <button class="filter-btn" data-filter="TLE">TLE</button>
+            <button class="filter-btn" data-filter="INFRA_ERR">GEN/NAIVE</button>
           </div>
         </div>
         
@@ -208,7 +220,7 @@
             <thead>
               <tr>
                 <th width="70">Case #</th>
-                <th width="65">判定</th>
+                <th width="135">判定</th>
                 <th width="90">入力サイズ</th>
                 <th width="80">時間</th>
                 <th>概要</th>
@@ -250,7 +262,10 @@
           <!-- 正解 vs 実際 -->
           <div class="detail-box">
             <div class="box-header">
-              <span class="text-emerald">愚直解の出力 (Expected):</span>
+              <div class="box-header-left">
+                <span class="text-emerald" id="detail-naive-label">愚直解の出力 (Naive):</span>
+                <span id="detail-naive-status" class="box-status-tag" style="display: none;"></span>
+              </div>
               <button id="btn-copy-fail-naive" class="btn-text">コピー</button>
             </div>
             <pre id="detail-naive-pre" class="detail-pre expected"></pre>
@@ -258,7 +273,10 @@
 
           <div class="detail-box">
             <div class="box-header">
-              <span class="text-rose">検証解の出力 (Actual):</span>
+              <div class="box-header-left">
+                <span class="text-rose" id="detail-solver-label">検証解の出力 (Solver):</span>
+                <span id="detail-solver-status" class="box-status-tag" style="display: none;"></span>
+              </div>
               <button id="btn-copy-fail-solver" class="btn-text">コピー</button>
             </div>
             <pre id="detail-solver-pre" class="detail-pre actual"></pre>
