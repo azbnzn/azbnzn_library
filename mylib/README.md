@@ -30,25 +30,32 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
     - [ZobristHash (多重集合・区間一致・順列判定・動的ハッシュ)](#zobristhash-多重集合区間一致順列判定動的ハッシュ)
     - [IntervalSet / IntervalMap (区間を set で管理するテク・mex・Chtholly Tree)](#intervalset--intervalmap-区間を-set-で管理するテクmexchtholly-tree)
     - [MultiDimensionalCumulativeSum (3次元以上の多次元累積和・多次元いもす法)](#multidimensionalcumulativesum-3次元以上の多次元累積和多次元いもす法)
+    - [MergeTechnique (マージテク・Small to Large・DSU on Tree)](#mergetechnique-マージテクsmall-to-largedsu-on-tree)
   - [2. 文字列 (Strings)](#2-文字列-strings)
     - [DoubleRollingHash (安全なダブルローリングハッシュ・点更新対応)](#doublerollinghash-安全なダブルローリングハッシュ点更新対応)
     - [DynamicStringTreap (動的文字列平衡二分木)](#dynamicstringtreap-動的文字列平衡二分木)
     - [Trie / MapTrie](#trie--maptrie)
   - [3. グラフ・木 (Graphs & Trees)](#3-グラフ木-graphs--trees)
     - [Dijkstra (単一始点最短経路)](#dijkstra-単一始点最短経路)
+    - [ZeroOneBFS (01-BFS・重み0/1最短経路)](#zeroonebfs-01-bfs重み01最短経路)
     - [BellmanFord (多機能ベルマンフォード法)](#bellmanford-多機能ベルマンフォード法)
     - [TopologicalSort (トポロジカルソート)](#topologicalsort-トポロジカルソート)
     - [Rerooting (全方位木DP)](#rerooting-全方位木dp)
     - [EulerTour (オイラーツアー・LCA)](#eulertour)
     - [LowestCommonAncestor (LCA・木上の重み付き最短距離・パスJump)](#lowestcommonancestor)
+    - [TreeDiameter (木の直径・パス復元・中心・最遠点距離)](#treediameter-木の直径パス復元中心最遠点距離)
   - [4. 数学・数論 (Math & Number Theory)](#4-数学数論-math--number-theory)
     - [NumberTheory (高速数論・素因数分解・CRT)](#numbertheory-高速数論素因数分解crt)
     - [Prime (巨大素数判定・素因数分解・線形篩・区間篩)](#prime)
+    - [OsakSieve (osa_k法・最小素因数SPF高速素因数分解)](#osaksieve-osa_k法最小素因数spf高速素因数分解)
     - [BiCoef (二項係数・順列・重複組合せ)](#bicoef-二項係数順列重複組合せ)
     - [LinearDiophantine (一次不定方程式)](#lineardiophantine-一次不定方程式)
     - [Matrix (半環対応汎用行列累乗)](#matrix-半環対応汎用行列累乗)
   - [5. 幾何 (Geometry)](#5-幾何-geometry)
     - [Geometry (2次元計算幾何)](#geometry-2次元計算幾何)
+  - [6. 探索・最適化 (Search & Optimization)](#6-探索最適化-search--optimization)
+    - [TernarySearch (三分探索)](#ternarysearch-三分探索)
+    - [GoldenSectionSearch (黄金分割探索・フィボナッチ探索)](#goldensectionsearch-黄金分割探索フィボナッチ探索)
 - [一括インクルード (All.hpp)](#一括インクルード-allhpp)
 - [使い方と環境設定](#使い方と環境設定)
 
@@ -86,26 +93,32 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
 | 座標圧縮・添字変換・復元 | `CoordinateCompression<T>` | 構築 $O(N \log N)$<br>取得 $O(\log N)$ / $O(1)$ | `CoordinateCompression.hpp` |
 | オフライン区間クエリ・伸縮更新 (Mo's algorithm) | `MosAlgorithm` (`Mo`) | $O(N \sqrt{Q})$ | `MosAlgorithm.hpp` |
 | 尺取り法（単調性のある区間条件の極大区間列挙） | `two_pointers` | $O(N)$ | `TwoPointers.hpp` |
+| マージテク・Small to Large・DSU on Tree (Sack) | `SmallToLargeDSU`, `TreeMerge`, `merge_small_to_large` | 全体 $O(N \log N)$ | `MergeTechnique.hpp` |
 | 区間多重集合一致・区間順列判定・状態ハッシュ | `ZobristHash` / `DynamicZobristHash` | 構築 $O(N)$<br>クエリ $O(1)$ / $O(\log N)$ | `ZobristHash.hpp` |
 | 区間の集合管理・マージ・被覆長・mex・区間色塗り | `IntervalSet` / `IntervalMap` | ならし $O(\log N)$ / クエリ $O(\log N)$ | `IntervalSet.hpp` |
 | 3次元以上の多次元累積和・多次元いもす法 | `MultiDimensionalPrefixSum` / `MultiDimensionalImos` / `PrefixSum3D` | 構築 $O(D \cdot \prod N_k)$<br>クエリ $O(2^D)$ / $O(1)$ | `MultiDimensionalCumulativeSum.hpp` |
 | 文字列一致判定・点更新クエリ・回文判定 | `DoubleRollingHash` | ハッシュ取得 $O(1)$ / 更新 $O(\log N)$<br>LCP $O(\log N)$ | `DoubleRollingHash.hpp` |
 | 文字列の任意位置挿入・削除・区間文字種数 | `DynamicStringTreap` | 各種操作 $O(\log N)$ | `DynamicStringTreap.hpp` |
 | 複数文字列のプレフィックス検索・辞書 | `Trie` / `MapTrie<T>` | 挿入・検索 $O(|S|)$ | `Trie.hpp` |
-| 単一始点最短経路 (重み付き正辺グラフ) | `dijkstra` | $O((V + E) \log V)$ | `Dijkstra.hpp` |
+| 単一始点・多始点・グリッド最短経路・経路復元 | `dijkstra`, `Dijkstra<T>`, `dijkstra_grid` | $O((V + E) \log V)$ | `Dijkstra.hpp` |
+| 重み 0 / 1 のグラフ・グリッド最短経路 | `zero_one_bfs`, `ZeroOneBFS<T>`, `zero_one_bfs_grid` | $O(V + E)$ | `ZeroOneBFS.hpp` |
 | 負辺・最長路・SPFA・差分制約・最小平均閉路・Johnson APSP | `BellmanFord`, `DifferenceConstraints` | $O(VE)$ / $O(VE \log V)$ | `BellmanFord.hpp` |
 | 依存関係の順序付け・閉路検出・DAG判定 | `topological_sort` | $O(V + E)$ | `TopologicalSort.hpp` |
 | 木のすべての頂点を根としたときの木DP | `Rerooting<...>` | $O(N)$ | `Rerooting.hpp` |
 | 木の部分木クエリ・LCA・頂点間距離 | `EulerTour` | 構築 $O(N \log N)$<br>LCA $O(1)$ | `EulerTour.hpp` |
 | 木の2点間LCA・重み付き距離・パスJump | `LowestCommonAncestor<T>` (`LCA`) | 構築 $O(N \log N)$<br>クエリ $O(\log N)$ | `LowestCommonAncestor.hpp` |
+| 木の直径・両端点・パス復元・木の中心・最遠点距離 | `TreeDiameter<T>` | $O(N)$ | `TreeDiameter.hpp` |
 | 高速素数判定 ($N \le 10^{18}$) | `miller_rabin(n)` | $O(k \log^3 n)$ | `NumberTheory.hpp` |
 | 素数判定・素因数分解・線形篩・区間篩 | `Prime` / `PrimeSieve` | クエリ $O(\log X)$ / $O(N^{1/4})$ | `Prime.hpp` |
+| osa_k法（最小素因数 SPF による高速素因数分解・約数列挙） | `OsakSieve` | 前計算 $O(N)$<br>クエリ $O(\log X)$ | `OsakSieve.hpp` |
 | 高速素因数分解 ($N \le 10^{18}$) | `pollard_rho(n)` / `factorize(n)` | $O(N^{1/4})$ | `NumberTheory.hpp` |
 | 拡張ユークリッド互除法・中国剰余定理 | `extgcd`, `modinv`, `crt` | $O(\log(\min(a, b)))$ | `NumberTheory.hpp` |
 | 順列・組合せ ($nPr, nCr, nHr$) の高速計算 | `BiCoef<mint>` | 前計算 $O(N)$<br>クエリ $O(1)$ | `BiCoef.hpp` |
 | 一次不定方程式 $ax + by = c$ の整数解 | `LinearDiophantine` | $O(\log(\min(a, b)))$ | `LinearDiophantine.hpp` |
 | 遷移の高速化・グリッドパス数・最短路DP | `Matrix<T, Semiring>` | $O(K^3 \log N)$ | `Matrix.hpp` |
 | 幾何交差判定・凸包・点内外判定・円交差 | `Geometry` | 凸包 $O(N \log N)$ ほか | `Geometry.hpp` |
+| 単峰性関数の極値探索（実数・整数） | `ternary_search_real` / `ternary_search_int` | 実数 $O(\text{iter})$ / 整数 $O(\log_{1.5} W)$ | `TernarySearch.hpp` |
+| 単峰性関数の極値探索（評価回数削減・フィボナッチ探索） | `golden_section_search_real` / `golden_section_search_int` | 1回評価 / ステップ | `GoldenSectionSearch.hpp` |
 
 ---
 
@@ -2329,9 +2342,30 @@ mo.run(add, del, out);
 
 ```cpp
 #pragma once
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 using namespace std;
+
+// ============================================================================
+// Mo's Algorithm (クエリ平方分割)
+// ============================================================================
+// ・オフライン区間クエリ [l, r) に対して、両端点を 1 つずつ伸縮させて状態を更新する。
+// ・ブロック幅 B = max(1, N / sqrt(Q * 2 / 3)) 程度とし、偶奇ソートで定数倍高速化。
+// ・計算量: O(N * sqrt(Q))
+//
+// 使用例:
+//   MosAlgorithm mo(n);
+//   for (auto [l, r] : queries) mo.add_query(l, r); // 半開区間 [l, r)
+//
+//   vector<int> ans(q);
+//   auto add = [&](int idx) { ... };
+//   auto del = [&](int idx) { ... };
+//   auto out = [&](int q_id) { ans[q_id] = ...; };
+//
+//   mo.run(add, del, out);
+// ============================================================================
 
 struct MosAlgorithm {
   int n;
@@ -2341,13 +2375,20 @@ struct MosAlgorithm {
   vector<Query> queries;
   int bucket_size;
 
+  // n: 配列の長さ
+  // bucket_size: 1ブロックの幅 (-1 の場合はクエリ数に応じて自動決定)
   MosAlgorithm(int n = 0, int bucket_size = -1)
       : n(n), bucket_size(bucket_size) {}
 
+  // 半開区間 [l, r) のクエリを追加 (0-indexed)
   void add_query(int l, int r) {
     queries.push_back({l, r, (int)queries.size()});
   }
 
+  // add(idx), del(idx), out(q_id) を渡して実行
+  // add: インデックス idx の要素を区間に加える
+  // del: インデックス idx の要素を区間から除外する
+  // out: クエリ q_id の解答を出力・記録する
   template <typename Add, typename Del, typename Out>
   void run(const Add &add, const Del &del, const Out &out) {
     int q = queries.size();
@@ -2359,6 +2400,7 @@ struct MosAlgorithm {
       bs = max(1, (int)(n / max(1.0, sqrt(q * 2.0 / 3.0))));
     }
 
+    // 偶奇ソート (奇数ブロックは r を降順にして右端点の往復移動を削減)
     sort(queries.begin(), queries.end(), [&](const Query &a, const Query &b) {
       int ablock = a.l / bs, bblock = b.l / bs;
       if (ablock != bblock)
@@ -2388,6 +2430,7 @@ struct MosAlgorithm {
     }
   }
 
+  // 左右で端点追加・削除の挙動が異なる場合
   template <typename AddL, typename AddR, typename DelL, typename DelR,
             typename Out>
   void run(const AddL &add_l, const AddR &add_r, const DelL &del_l,
@@ -2429,6 +2472,14 @@ struct MosAlgorithm {
       out(qry.id);
     }
   }
+
+  // templates 互換エイリアス
+  template <typename AddL, typename AddR, typename DelL, typename DelR,
+            typename Out>
+  void run_lr(const AddL &add_l, const AddR &add_r, const DelL &del_l,
+              const DelR &del_r, const Out &out) {
+    run(add_l, add_r, del_l, del_r, out);
+  }
 };
 
 using Mo = MosAlgorithm;
@@ -2437,7 +2488,7 @@ using Mo = MosAlgorithm;
 </details>
 
 #### TwoPointers (尺取り法)
-単調性のある区間条件に対し、各左端 `l` に対する極大な右端 `r`（半開区間 `[l, r)`）を $O(N)$ で走査するヘルパー関数です。`l == r` の追い越し防止や境界チェックを自動処理します。
+単調性のある区間条件に対し、半開区間 `[l, r)` を $O(N)$ で走査するヘルパー関数群です。左端固定・右端固定・条件を満たす最短区間探索の 3 パターンすべてに対応しています。
 - **ファイル**: `mylib/TwoPointers.hpp`
 - **計算量**: $O(N)$（状態更新が $O(1)$ の場合）
 
@@ -2446,20 +2497,30 @@ using Mo = MosAlgorithm;
 
 long long sum = 0, ans = 0;
 
-// 使い方 1: eval(l, r) で極大区間 [l, r) ごとに処理
+// 1. 左端 l 固定: eval(l, r) で極大区間 [l, r) ごとに処理
 two_pointers(
     n,
     [&](int r) { return sum + a[r] <= k; }, // can_add(r): 追加可能か
     [&](int r) { sum += a[r]; },            // add(r): 右端を追加
     [&](int l) { sum -= a[l]; },            // del(l): 左端を削除
-    [&](int l, int r) { ans += r - l; }     // eval(l, r): 極大区間 [l, r) の評価
+    [&](int l, int r) { ans += r - l; }     // eval(l, r): 極大区間 [l, r)
 );
 
-// 使い方 2: eval を省略して各 l に対する極大右端 max_r[l] の配列を取得
-auto max_r = two_pointers(
+// 2. 右端 r 固定: 一旦追加してから違反している間 l を進める
+sum = 0;
+auto min_l = two_pointers_right(
     n,
-    [&](int r) { return sum + a[r] <= k; },
     [&](int r) { sum += a[r]; },
+    [&]() { return sum <= k; },
+    [&](int l) { sum -= a[l]; }
+);
+
+// 3. 条件を満たす最短区間の長さを求める (例: 和 >= k, なければ -1)
+sum = 0;
+int shortest = two_pointers_min_len(
+    n,
+    [&](int r) { sum += a[r]; },
+    [&]() { return sum >= k; },
     [&](int l) { sum -= a[l]; }
 );
 ```
@@ -2469,13 +2530,35 @@ auto max_r = two_pointers(
 
 ```cpp
 #pragma once
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <cassert>
+#include <vector>
 
 using namespace std;
 
+// ============================================================================
+// 尺取り法 (Two Pointers)
+// ============================================================================
+// ・単調性のある区間条件に対し、半開区間 [l, r) を O(N) で走査する 3 パターンを提供。
+//
+// 1. 左端 l 固定 (極大区間 [l, r) / 違反状態に入らない):
+//    two_pointers(n, can_add, add, del, eval)
+//    two_pointers(n, can_add, add, del) -> 各 l の極大右端 max_r[l]
+//
+// 2. 右端 r 固定 (極大区間 [l, r + 1) / 追加してから違反分を削る):
+//    two_pointers_right(n, add, is_valid, del, eval)
+//    two_pointers_right(n, add, is_valid, del) -> 各 r の最小左端 min_l[r]
+//
+// 3. 条件を満たす最短区間探索 (「和 >= K」等の最小長・全有効極小区間列挙):
+//    two_pointers_min(n, add, is_valid, del, eval)
+//    two_pointers_min_len(n, add, is_valid, del) -> 最短長 (なければ -1)
+// ============================================================================
+
+// --- パターン 1: 左端 l 固定ループ (極大な有効区間 [l, r)) ---
 template <typename CanAdd, typename Add, typename Del, typename Eval>
-void two_pointers(int n, const CanAdd &can_add, const Add &add, const Del &del,
-                  const Eval &eval) {
+inline void two_pointers(int n, const CanAdd &can_add, const Add &add,
+                         const Del &del, const Eval &eval) {
+  assert(n >= 0);
   int r = 0;
   for (int l = 0; l < n; l++) {
     while (r < n && can_add(r)) {
@@ -2492,12 +2575,63 @@ void two_pointers(int n, const CanAdd &can_add, const Add &add, const Del &del,
 }
 
 template <typename CanAdd, typename Add, typename Del>
-vector<int> two_pointers(int n, const CanAdd &can_add, const Add &add,
-                         const Del &del) {
+inline vector<int> two_pointers(int n, const CanAdd &can_add, const Add &add,
+                                const Del &del) {
   vector<int> max_r(n);
-  two_pointers(
-      n, can_add, add, del, [&](int l, int r) { max_r[l] = r; });
+  two_pointers(n, can_add, add, del, [&](int l, int r) { max_r[l] = r; });
   return max_r;
+}
+
+// --- パターン 2: 右端 r 固定ループ (一旦 r を追加し、違反している間 l を進める) ---
+// eval(l, r + 1): 半開区間 [l, r + 1) が条件を満たす最大の区間
+template <typename Add, typename IsValid, typename Del, typename Eval>
+inline void two_pointers_right(int n, const Add &add, const IsValid &is_valid,
+                               const Del &del, const Eval &eval) {
+  assert(n >= 0);
+  int l = 0;
+  for (int r = 0; r < n; r++) {
+    add(r);
+    while (l <= r && !is_valid()) {
+      del(l);
+      l++;
+    }
+    eval(l, r + 1);
+  }
+}
+
+template <typename Add, typename IsValid, typename Del>
+inline vector<int> two_pointers_right(int n, const Add &add,
+                                      const IsValid &is_valid, const Del &del) {
+  vector<int> min_l(n);
+  two_pointers_right(n, add, is_valid, del,
+                     [&](int l, int r) { min_l[r - 1] = l; });
+  return min_l;
+}
+
+// --- パターン 3: 条件を満たす「最短」区間探索 ---
+// r を追加し、is_valid() が true の間 eval(l, r + 1) を呼んで l を進める
+template <typename Add, typename IsValid, typename Del, typename Eval>
+inline void two_pointers_min(int n, const Add &add, const IsValid &is_valid,
+                             const Del &del, const Eval &eval) {
+  assert(n >= 0);
+  int l = 0;
+  for (int r = 0; r < n; r++) {
+    add(r);
+    while (l <= r && is_valid()) {
+      eval(l, r + 1);
+      del(l);
+      l++;
+    }
+  }
+}
+
+template <typename Add, typename IsValid, typename Del>
+inline int two_pointers_min_len(int n, const Add &add, const IsValid &is_valid,
+                                const Del &del) {
+  int best = n + 1;
+  two_pointers_min(n, add, is_valid, del,
+                   [&](int l, int r) { best = min(best, r - l); });
+  return (best <= n) ? best : -1;
 }
 ```
 
@@ -4240,6 +4374,277 @@ using ImosND = MultiDimensionalImos<T, D>;
 ```
 
 </details>
+
+---
+
+#### MergeTechnique (マージテク・Small to Large・DSU on Tree)
+「小さい方の集合を大きい方の集合へ移す (`swap`)」ことで全体の計算量を $O(N \log N)$ に抑えるマージテクのライブラリです。コンテナの汎用マージ関数、`O(1)` 代表元参照可能な要素列付き Union-Find (`SmallToLargeDSU`)、木上の省メモリ部分木クエリエンジン (`TreeMerge` / Sack) を提供します。
+- **ファイル**: `mylib/MergeTechnique.hpp`
+- **計算量**: 全体 $O(N \log N)$ 〜 $O(N \log^2 N)$
+
+```cpp
+#include "mylib/MergeTechnique.hpp"
+
+// 1. クエリによる集合マージ (要素列維持 + O(1) 代表元参照)
+SmallToLargeDSU dsu(n);
+dsu.merge(u, v, [&](int x, int new_leader, int old_leader) {
+    // 移動する要素ごとの追加処理
+});
+for (int elem : dsu.members(u)) { /* u が属する集合の全要素 */ }
+
+// 2. set / vector / map 等の Small-to-Large マージ
+set<int> a, b;
+merge_small_to_large(a, b);
+map<int, long long> mp1, mp2;
+merge_map_small_to_large(mp1, mp2); // 同一キーは値を合算 (+=)
+
+// 3. 木上の部分木クエリ (DSU on Tree / Sack)
+TreeMerge tm(n);
+tm.add_edge(u, v);
+tm.run(0, add, remove, answer); // answer(u) 時点で部分木 u の全要素のみが反映済み
+```
+
+<details>
+<summary><b>ソースコードを展開 (MergeTechnique.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <algorithm>
+#include <cassert>
+#include <iterator>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+using namespace std;
+
+// ============================================================================
+// マージテク / Small to Large (MergeTechnique)
+// ============================================================================
+// 「小さい方の集合を大きい方の集合へ移す (必要なら swap する)」ことで、
+// 要素の移動回数を 1 要素あたり O(log N) 回、全体 O(N log N) に抑えるテクニック集。
+//
+// 【主な機能】
+// 1. merge_small_to_large(dst, src):
+//    - set / multiset / unordered_set / vector / deque を高速マージして src を空にする
+// 2. merge_map_small_to_large(dst, src, combine):
+//    - map / unordered_map のキーごとマージ (既定は += で値合算)
+// 3. SmallToLargeDSU:
+//    - クエリでの集合マージを O(N log N) で管理 (各集合の要素列・O(1)代表元取得・移動コールバック)
+// 4. TreeMerge (DSU on Tree / Sack):
+//    - 部分木クエリを O(N log N) 回・省メモリ (O(N)) で解く木上マージフレームワーク
+// ============================================================================
+
+namespace merge_internal {
+
+template <typename T, typename = void> struct has_push_back : false_type {};
+template <typename T>
+struct has_push_back<
+    T, void_t<decltype(declval<T &>().push_back(declval<typename T::value_type>()))>>
+    : true_type {};
+
+template <typename T, typename = void> struct has_reserve : false_type {};
+template <typename T>
+struct has_reserve<T, void_t<decltype(declval<T &>().reserve(0))>> : true_type {};
+
+template <typename T, typename = void> struct has_merge_method : false_type {};
+template <typename T>
+struct has_merge_method<T, void_t<decltype(declval<T &>().merge(declval<T &>()))>>
+    : true_type {};
+
+} // namespace merge_internal
+
+// set / multiset / unordered_set / vector / deque の Small-to-Large マージ
+// 小さい方を大きい方へ吸収し、dst に統合結果、src を空にする。
+template <typename Container>
+inline void merge_small_to_large(Container &dst, Container &src) {
+  if (&dst == &src)
+    return;
+  if (dst.size() < src.size())
+    swap(dst, src);
+  if constexpr (merge_internal::has_push_back<Container>::value) {
+    if constexpr (merge_internal::has_reserve<Container>::value) {
+      dst.reserve(dst.size() + src.size());
+    }
+    for (auto &x : src) {
+      dst.push_back(std::move(x));
+    }
+  } else if constexpr (merge_internal::has_merge_method<Container>::value) {
+    dst.merge(src);
+  } else {
+    dst.insert(make_move_iterator(src.begin()), make_move_iterator(src.end()));
+  }
+  src.clear();
+}
+
+// map / unordered_map の Small-to-Large マージ (値結合関数 combine 指定可能)
+template <typename Map, typename Combine>
+inline void merge_map_small_to_large(Map &dst, Map &src, Combine combine) {
+  if (&dst == &src)
+    return;
+  if (dst.size() < src.size())
+    swap(dst, src);
+  for (auto &kv : src) {
+    auto it = dst.find(kv.first);
+    if (it == dst.end()) {
+      dst.emplace(kv.first, std::move(kv.second));
+    } else {
+      combine(it->second, kv.second);
+    }
+  }
+  src.clear();
+}
+
+template <typename Map>
+inline void merge_map_small_to_large(Map &dst, Map &src) {
+  merge_map_small_to_large(
+      dst, src, [](auto &a, const auto &b) { a += b; });
+}
+
+// ----------------------------------------------------------------------------
+// クエリによる集合マージ (3.cpp スタイル / 要素列保持 + O(1) 代表元参照)
+// ----------------------------------------------------------------------------
+struct SmallToLargeDSU {
+  int n;
+  int num_groups_;
+  vector<vector<int>> groups; // groups[leader(u)] に属する全要素
+  vector<int> par;            // par[x]: 要素 x の現在の代表元 (常に O(1))
+
+  explicit SmallToLargeDSU(int n = 0) : n(n), num_groups_(n), groups(n), par(n) {
+    assert(n >= 0);
+    for (int i = 0; i < n; ++i) {
+      groups[i].push_back(i);
+      par[i] = i;
+    }
+  }
+
+  int leader(int u) const {
+    assert(0 <= u && u < n);
+    return par[u];
+  }
+
+  int root(int u) const { return leader(u); }
+
+  bool same(int u, int v) const {
+    assert(0 <= u && u < n && 0 <= v && v < n);
+    return par[u] == par[v];
+  }
+
+  int size(int u) const {
+    assert(0 <= u && u < n);
+    return (int)groups[par[u]].size();
+  }
+
+  int count_groups() const { return num_groups_; }
+
+  const vector<int> &members(int u) const {
+    assert(0 <= u && u < n);
+    return groups[par[u]];
+  }
+
+  // 集合併合時に移動する各要素 (elem, new_leader, old_leader) へコールバックしつつマージ
+  template <typename OnMove>
+  bool merge(int u, int v, OnMove on_move) {
+    assert(0 <= u && u < n && 0 <= v && v < n);
+    u = par[u];
+    v = par[v];
+    if (u == v)
+      return false;
+    if (groups[u].size() < groups[v].size())
+      swap(u, v);
+    groups[u].reserve(groups[u].size() + groups[v].size());
+    for (int x : groups[v]) {
+      on_move(x, u, v);
+      groups[u].push_back(x);
+      par[x] = u;
+    }
+    groups[v].clear();
+    num_groups_--;
+    return true;
+  }
+
+  bool merge(int u, int v) {
+    return merge(u, v, [](int, int, int) {});
+  }
+
+  bool unite(int u, int v) { return merge(u, v); }
+};
+
+// ----------------------------------------------------------------------------
+// 木上のマージテク (DSU on Tree / Sack) 汎用エンジン O(N log N)
+// ----------------------------------------------------------------------------
+// add(v)    : 頂点 v の寄与をグローバル状態へ追加
+// remove(v) : 頂点 v の寄与をグローバル状態から削除
+// answer(u) : 状態が「部分木 u の全頂点」のみを保持しているタイミングで呼ばれる
+struct TreeMerge {
+  int n;
+  vector<vector<int>> g;
+
+  explicit TreeMerge(int n = 0) : n(n), g(n) { assert(n >= 0); }
+
+  void add_edge(int u, int v) {
+    assert(0 <= u && u < n && 0 <= v && v < n);
+    g[u].push_back(v);
+    g[v].push_back(u);
+  }
+
+  template <typename Add, typename Remove, typename Answer>
+  void run(int root, Add add, Remove remove, Answer answer) const {
+    if (n == 0)
+      return;
+    assert(0 <= root && root < n);
+
+    vector<int> sub(n, 1), heavy(n, -1), tin(n), tout(n), order(n);
+    int timer = 0;
+    auto dfs_sz = [&](auto &self, int u, int p) -> void {
+      tin[u] = timer;
+      order[timer++] = u;
+      int max_sz = 0;
+      for (int v : g[u]) {
+        if (v == p)
+          continue;
+        self(self, v, u);
+        sub[u] += sub[v];
+        if (sub[v] > max_sz) {
+          max_sz = sub[v];
+          heavy[u] = v;
+        }
+      }
+      tout[u] = timer;
+    };
+    dfs_sz(dfs_sz, root, -1);
+
+    auto dfs = [&](auto &self, int u, int p, bool keep) -> void {
+      for (int v : g[u]) {
+        if (v != p && v != heavy[u]) {
+          self(self, v, u, false);
+        }
+      }
+      if (heavy[u] != -1) {
+        self(self, heavy[u], u, true);
+      }
+      for (int v : g[u]) {
+        if (v != p && v != heavy[u]) {
+          for (int idx = tin[v]; idx < tout[v]; ++idx) {
+            add(order[idx]);
+          }
+        }
+      }
+      add(u);
+      answer(u);
+      if (!keep) {
+        for (int idx = tin[u]; idx < tout[u]; ++idx) {
+          remove(order[idx]);
+        }
+      }
+    };
+    dfs(dfs, root, -1, false);
+  }
+};
+```
+
+</details>
+
 ---
 
 ### 2. 文字列 (Strings)
@@ -5011,19 +5416,26 @@ struct Trie {
 ### 3. グラフ・木 (Graphs & Trees)
 
 #### Dijkstra (単一始点最短経路)
-非負重み付きグラフに対する単一始点最短経路法です。
+非負重み付きグラフ・グリッドに対する最短経路法です。従来の簡易関数 `dijkstra(g, start)` に加え、多始点・経路復元 (`Dijkstra<T>`, `dijkstra_with_path`) やグリッド版 (`dijkstra_grid`) も提供します。
 - **ファイル**: `mylib/Dijkstra.hpp`
 - **計算量**: $O((V + E) \log V)$（到達不可ノードは `-1` を返す）
 
 ```cpp
 #include "mylib/Dijkstra.hpp"
 
-int n = 5;
+// 1. 簡易関数 (従来互換)
 vector<vector<pair<int, long long>>> g(n);
 g[u].push_back({v, cost});
-g[v].push_back({u, cost});
-
 vector<long long> dist = dijkstra(g, 0); // 始点 0 からの最短距離
+
+// 2. 構造体版 (経路復元・多始点・任意型 T)
+Dijkstra<long long> dij(n);
+dij.add_edge(u, v, cost);
+dij.run(0);
+auto path = dij.get_path(goal); // {0, ..., goal}
+
+// 3. グリッド版
+auto gdist = dijkstra_grid(grid, {sx, sy}, '#');
 ```
 
 <details>
@@ -5031,45 +5443,684 @@ vector<long long> dist = dijkstra(g, 0); // 始点 0 からの最短距離
 
 ```cpp
 #pragma once
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <queue>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace std;
+
+// ============================================================================
+// ダイクストラ法 (Dijkstra's Algorithm) O((V + E) log V)
+// ============================================================================
+// 【主な機能】
+// 1. 簡易関数 (互換 API):
+//    - dijkstra(g, start_pos) / dijkstra(g, starts): 各頂点への最短距離 (未到達は -1)
+//    - dijkstra_with_path(g, start_pos): {dist, prev_node} を返す
+//    - dijkstra_grid(...): グリッド上のダイクストラ法 (任意コスト・4/8方向対応)
+//
+// 2. Dijkstra<T> 構造体 (デフォルト T = long long):
+//    - run(start) / run(starts) / get_path(target) / get_path_edges(target)
+//    - is_reachable(v) / dist(v) / get_dist_optional(v) / dists()
+// ============================================================================
+
+template <typename T = long long> struct Dijkstra {
+  struct Edge {
+    int from;
+    int to;
+    T cost;
+    int id;
+  };
+
+private:
+  int n_;
+  vector<Edge> edges_;
+  vector<vector<int>> adj_;
+  vector<T> dist_;
+  vector<uint8_t> reached_;
+  vector<int> parent_;
+  vector<int> parent_edge_;
+
+public:
+  explicit Dijkstra(int n = 0) : n_(n), adj_(n) { assert(n >= 0); }
+
+  explicit Dijkstra(const vector<vector<pair<int, T>>> &g)
+      : n_((int)g.size()), adj_(g.size()) {
+    for (int u = 0; u < n_; ++u) {
+      for (const auto &p : g[u]) {
+        add_edge(u, p.first, p.second);
+      }
+    }
+  }
+
+  int add_edge(int from, int to, T cost) {
+    assert(0 <= from && from < n_);
+    assert(0 <= to && to < n_);
+    assert(cost >= 0);
+    int id = (int)edges_.size();
+    edges_.push_back({from, to, cost, id});
+    adj_[from].push_back(id);
+    return id;
+  }
+
+  void add_undirected_edge(int u, int v, T cost) {
+    add_edge(u, v, cost);
+    add_edge(v, u, cost);
+  }
+
+  void clear(int new_n = -1) {
+    if (new_n >= 0) {
+      assert(new_n >= 0);
+      n_ = new_n;
+    }
+    edges_.clear();
+    adj_.assign(n_, {});
+    dist_.clear();
+    reached_.clear();
+    parent_.clear();
+    parent_edge_.clear();
+  }
+
+  int num_vertices() const { return n_; }
+  int num_edges() const { return (int)edges_.size(); }
+
+  const vector<T> &run(int start = 0) {
+    if (n_ == 0)
+      return run(vector<int>{});
+    assert(0 <= start && start < n_);
+    return run(vector<int>{start});
+  }
+
+  const vector<T> &run(const vector<int> &starts) {
+    dist_.assign(n_, (T)-1);
+    reached_.assign(n_, 0);
+    parent_.assign(n_, -1);
+    parent_edge_.assign(n_, -1);
+
+    using P = pair<T, int>;
+    priority_queue<P, vector<P>, greater<P>> todo;
+    for (int s : starts) {
+      assert(0 <= s && s < n_);
+      if (!reached_[s]) {
+        reached_[s] = 1;
+        dist_[s] = 0;
+        todo.push({(T)0, s});
+      }
+    }
+
+    while (!todo.empty()) {
+      auto [c, u] = todo.top();
+      todo.pop();
+      if (c > dist_[u])
+        continue;
+
+      for (int eid : adj_[u]) {
+        const auto &e = edges_[eid];
+        int v = e.to;
+        T nc = c + e.cost;
+        if (!reached_[v] || nc < dist_[v]) {
+          reached_[v] = 1;
+          dist_[v] = nc;
+          parent_[v] = u;
+          parent_edge_[v] = e.id;
+          todo.push({nc, v});
+        }
+      }
+    }
+    return dist_;
+  }
+
+  bool is_reachable(int v) const {
+    assert(0 <= v && v < n_);
+    return !reached_.empty() && reached_[v] != 0;
+  }
+
+  T dist(int v) const {
+    assert(0 <= v && v < n_);
+    assert(!dist_.empty());
+    return dist_[v];
+  }
+
+  T operator[](int v) const { return dist(v); }
+  const vector<T> &dists() const { return dist_; }
+
+  optional<T> get_dist_optional(int v) const {
+    if (!is_reachable(v))
+      return nullopt;
+    return dist_[v];
+  }
+
+  vector<int> get_path(int target) const {
+    if (!is_reachable(target))
+      return {};
+    vector<int> path;
+    for (int cur = target; cur != -1; cur = parent_[cur]) {
+      path.push_back(cur);
+    }
+    reverse(path.begin(), path.end());
+    return path;
+  }
+
+  vector<int> get_path_edges(int target) const {
+    if (!is_reachable(target))
+      return {};
+    vector<int> path_edges;
+    for (int cur = target; parent_[cur] != -1; cur = parent_[cur]) {
+      path_edges.push_back(parent_edge_[cur]);
+    }
+    reverse(path_edges.begin(), path_edges.end());
+    return path_edges;
+  }
+};
 
 // ダイクストラ法 (単一始点最短経路)
 // g: 隣接リスト g[from] = {{to, cost}, ...}
 // start_pos: 始点
 // 戻り値: 各頂点への最短距離 (到達不可は -1)
-vector<long long> dijkstra(const vector<vector<pair<int, long long>>> &g,
-                           int start_pos) {
-  int n = g.size();
+inline vector<long long>
+dijkstra(const vector<vector<pair<int, long long>>> &g, int start_pos) {
+  int n = (int)g.size();
   vector<long long> dist(n, -1);
-  // {コスト, 頂点} の昇順優先度付きキュー (コストは long long)
+  if (n == 0)
+    return dist;
+  assert(0 <= start_pos && start_pos < n);
+
   using P = pair<long long, int>;
   priority_queue<P, vector<P>, greater<P>> todo;
-
+  dist[start_pos] = 0;
   todo.push({0, start_pos});
+
   while (!todo.empty()) {
     auto [c, p] = todo.top();
     todo.pop();
-    if (dist[p] != -1) {
+    if (c > dist[p]) {
       continue;
     }
-    dist[p] = c;
     for (const auto &edge : g[p]) {
       int to = edge.first;
       long long cost = edge.second;
-      if (dist[to] == -1) {
-        todo.push({c + cost, to});
+      assert(cost >= 0);
+      long long nc = c + cost;
+      if (dist[to] == -1 || nc < dist[to]) {
+        dist[to] = nc;
+        todo.push({nc, to});
       }
     }
   }
   return dist;
 }
 
+// 多始点ダイクストラ法
+inline vector<long long>
+dijkstra(const vector<vector<pair<int, long long>>> &g,
+         const vector<int> &starts) {
+  Dijkstra<long long> dij(g);
+  return dij.run(starts);
+}
+
 // スペルミス互換用エイリアス
 inline vector<long long> dijksta(const vector<vector<pair<int, long long>>> &g,
                                  int start_pos) {
   return dijkstra(g, start_pos);
+}
+
+// 経路復元用 prev_node 付きダイクストラ ({dist, prev_node} を返す)
+inline pair<vector<long long>, vector<int>>
+dijkstra_with_path(const vector<vector<pair<int, long long>>> &g,
+                   int start_pos) {
+  int n = (int)g.size();
+  vector<long long> dist(n, -1);
+  vector<int> prev_node(n, -1);
+  if (n == 0)
+    return {dist, prev_node};
+  assert(0 <= start_pos && start_pos < n);
+
+  using P = pair<long long, int>;
+  priority_queue<P, vector<P>, greater<P>> todo;
+  dist[start_pos] = 0;
+  todo.push({0, start_pos});
+
+  while (!todo.empty()) {
+    auto [c, p] = todo.top();
+    todo.pop();
+    if (c > dist[p])
+      continue;
+    for (const auto &edge : g[p]) {
+      int to = edge.first;
+      long long cost = edge.second;
+      assert(cost >= 0);
+      long long nc = c + cost;
+      if (dist[to] == -1 || nc < dist[to]) {
+        dist[to] = nc;
+        prev_node[to] = p;
+        todo.push({nc, to});
+      }
+    }
+  }
+  return {dist, prev_node};
+}
+
+// --- グリッド版ダイクストラ法 ---
+// step_cost(x, y, nx, ny) -> T: 0 以上なら移動コスト、負なら通行不可
+template <typename T = long long, typename StepCost>
+inline vector<vector<T>> dijkstra_grid(int h, int w,
+                                       const vector<pair<int, int>> &starts,
+                                       StepCost step_cost, int dirs = 4) {
+  assert(h >= 0 && w >= 0);
+  assert(dirs == 4 || dirs == 8);
+  vector<vector<T>> dist(h, vector<T>(w, (T)-1));
+  vector<vector<uint8_t>> reached(h, vector<uint8_t>(w, 0));
+  if (h == 0 || w == 0)
+    return dist;
+
+  static constexpr int dx8[8] = {1, 0, -1, 0, 1, 1, -1, -1};
+  static constexpr int dy8[8] = {0, 1, 0, -1, 1, -1, 1, -1};
+
+  using P = pair<T, pair<int, int>>;
+  priority_queue<P, vector<P>, greater<P>> todo;
+  for (auto [sx, sy] : starts) {
+    assert(0 <= sx && sx < h && 0 <= sy && sy < w);
+    if (!reached[sx][sy]) {
+      reached[sx][sy] = 1;
+      dist[sx][sy] = 0;
+      todo.push({(T)0, {sx, sy}});
+    }
+  }
+
+  while (!todo.empty()) {
+    auto [c, pos] = todo.top();
+    auto [x, y] = pos;
+    todo.pop();
+    if (c > dist[x][y])
+      continue;
+
+    for (int k = 0; k < dirs; ++k) {
+      int nx = x + dx8[k];
+      int ny = y + dy8[k];
+      if (nx < 0 || nx >= h || ny < 0 || ny >= w)
+        continue;
+      T w_step = (T)step_cost(x, y, nx, ny);
+      if (w_step < 0)
+        continue;
+      T nc = c + w_step;
+      if (!reached[nx][ny] || nc < dist[nx][ny]) {
+        reached[nx][ny] = 1;
+        dist[nx][ny] = nc;
+        todo.push({nc, {nx, ny}});
+      }
+    }
+  }
+  return dist;
+}
+
+template <typename T = long long, typename StepCost>
+inline vector<vector<T>> dijkstra_grid(int h, int w, pair<int, int> start,
+                                       StepCost step_cost, int dirs = 4) {
+  return dijkstra_grid<T>(h, w, vector<pair<int, int>>{start}, step_cost, dirs);
+}
+
+inline vector<vector<long long>>
+dijkstra_grid(const vector<string> &grid, pair<int, int> start,
+              char wall = '#', long long step = 1, int dirs = 4) {
+  int h = (int)grid.size();
+  int w = (h == 0) ? 0 : (int)grid[0].size();
+  auto step_cost = [&](int, int, int nx, int ny) -> long long {
+    return (grid[nx][ny] == wall) ? -1LL : step;
+  };
+  return dijkstra_grid<long long>(h, w, start, step_cost, dirs);
+}
+```
+
+</details>
+
+---
+
+#### ZeroOneBFS (01-BFS・重み0/1最短経路)
+辺の重みが 0 または 1 のみのグラフやグリッドにおいて、`deque` を用いて $O(V + E)$ で最短距離・最短経路を求めるライブラリです。多始点・経路復元・グリッド版（壁破壊コスト 1 や通行コスト 0/1 等）に対応します。
+- **ファイル**: `mylib/ZeroOneBFS.hpp`
+- **計算量**: $O(V + E)$（未到達は `-1`）
+
+```cpp
+#include "mylib/ZeroOneBFS.hpp"
+
+// 1. グラフ版
+ZeroOneBFS<long long> bfs(n);
+bfs.add_edge(u, v, 0); // コスト 0
+bfs.add_edge(u, w, 1); // コスト 1
+bfs.run(0);
+long long d = bfs.dist(goal);
+auto path = bfs.get_path(goal);
+
+// 2. 簡易関数版 / グリッド版
+auto d_vec = zero_one_bfs(g, 0);
+auto gdist = zero_one_bfs_grid(grid, {sx, sy}, '.'); // '.' がコスト0, それ以外がコスト1
+```
+
+<details>
+<summary><b>ソースコードを展開 (ZeroOneBFS.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <algorithm>
+#include <cassert>
+#include <deque>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+using namespace std;
+
+// ============================================================================
+// 01-BFS (辺の重みが 0 または 1 のみのグラフに対する最短経路 O(V + E))
+// ============================================================================
+// 【主な機能】
+// 1. ZeroOneBFS<T> (デフォルト T = long long):
+//    - add_edge(from, to, w) / add_undirected_edge(u, v, w) (w は 0 または 1)
+//    - run(start) / run(starts): 単一始点・多始点 01-BFS (到達不可は dist == -1)
+//    - is_reachable(v), dist(v), get_dist_optional(v), dists()
+//    - get_path(target), get_path_edges(target): 最短経路復元
+//
+// 2. 簡易関数:
+//    - zero_one_bfs(g, start) / zero_one_bfs(g, starts)
+//    - zero_one_bfs_with_path(g, start): {dist, prev_node} を返す
+//    - zero_one_bfs_grid(...): グリッド上の 01-BFS (壁破壊や方向コスト 0/1 等)
+//
+// 使用例:
+//   ZeroOneBFS<> bfs(n);
+//   bfs.add_edge(u, v, w); // w in {0, 1}
+//   bfs.run(0);
+//   auto d = bfs.dist(goal);       // 未到達は -1
+//   auto path = bfs.get_path(goal); // {0, ..., goal}
+//
+//   // 簡易関数版 (dijkstra 互換)
+//   auto dist = zero_one_bfs(g, 0);
+// ============================================================================
+
+template <typename T = long long> struct ZeroOneBFS {
+  struct Edge {
+    int from;
+    int to;
+    int cost;
+    int id;
+  };
+
+private:
+  int n_;
+  vector<Edge> edges_;
+  vector<vector<int>> adj_;
+  vector<T> dist_;
+  vector<uint8_t> reached_;
+  vector<int> parent_;
+  vector<int> parent_edge_;
+
+public:
+  explicit ZeroOneBFS(int n = 0) : n_(n), adj_(n) { assert(n >= 0); }
+
+  template <typename W>
+  explicit ZeroOneBFS(const vector<vector<pair<int, W>>> &g)
+      : n_((int)g.size()), adj_(g.size()) {
+    for (int u = 0; u < n_; ++u) {
+      for (const auto &p : g[u]) {
+        add_edge(u, p.first, (int)p.second);
+      }
+    }
+  }
+
+  int add_edge(int from, int to, int cost) {
+    assert(0 <= from && from < n_);
+    assert(0 <= to && to < n_);
+    assert(cost == 0 || cost == 1);
+    int id = (int)edges_.size();
+    edges_.push_back({from, to, cost, id});
+    adj_[from].push_back(id);
+    return id;
+  }
+
+  void add_undirected_edge(int u, int v, int cost) {
+    add_edge(u, v, cost);
+    add_edge(v, u, cost);
+  }
+
+  void clear(int new_n = -1) {
+    if (new_n >= 0) {
+      assert(new_n >= 0);
+      n_ = new_n;
+    }
+    edges_.clear();
+    adj_.assign(n_, {});
+    dist_.clear();
+    reached_.clear();
+    parent_.clear();
+    parent_edge_.clear();
+  }
+
+  int num_vertices() const { return n_; }
+  int num_edges() const { return (int)edges_.size(); }
+
+  const vector<T> &run(int start = 0) {
+    if (n_ == 0)
+      return run(vector<int>{});
+    assert(0 <= start && start < n_);
+    return run(vector<int>{start});
+  }
+
+  const vector<T> &run(const vector<int> &starts) {
+    dist_.assign(n_, (T)-1);
+    reached_.assign(n_, 0);
+    parent_.assign(n_, -1);
+    parent_edge_.assign(n_, -1);
+
+    deque<pair<T, int>> todo;
+    for (int s : starts) {
+      assert(0 <= s && s < n_);
+      if (!reached_[s]) {
+        reached_[s] = 1;
+        dist_[s] = 0;
+        todo.push_back({(T)0, s});
+      }
+    }
+
+    while (!todo.empty()) {
+      auto [c, u] = todo.front();
+      todo.pop_front();
+      if (c != dist_[u])
+        continue;
+
+      for (int eid : adj_[u]) {
+        const auto &e = edges_[eid];
+        int v = e.to;
+        T nc = c + (T)e.cost;
+        if (!reached_[v] || nc < dist_[v]) {
+          reached_[v] = 1;
+          dist_[v] = nc;
+          parent_[v] = u;
+          parent_edge_[v] = e.id;
+          if (e.cost == 0) {
+            todo.push_front({nc, v});
+          } else {
+            todo.push_back({nc, v});
+          }
+        }
+      }
+    }
+    return dist_;
+  }
+
+  bool is_reachable(int v) const {
+    assert(0 <= v && v < n_);
+    return !reached_.empty() && reached_[v] != 0;
+  }
+
+  T dist(int v) const {
+    assert(0 <= v && v < n_);
+    assert(!dist_.empty());
+    return dist_[v];
+  }
+
+  T operator[](int v) const { return dist(v); }
+  const vector<T> &dists() const { return dist_; }
+
+  optional<T> get_dist_optional(int v) const {
+    if (!is_reachable(v))
+      return nullopt;
+    return dist_[v];
+  }
+
+  vector<int> get_path(int target) const {
+    if (!is_reachable(target))
+      return {};
+    vector<int> path;
+    for (int cur = target; cur != -1; cur = parent_[cur]) {
+      path.push_back(cur);
+    }
+    reverse(path.begin(), path.end());
+    return path;
+  }
+
+  vector<int> get_path_edges(int target) const {
+    if (!is_reachable(target))
+      return {};
+    vector<int> path_edges;
+    for (int cur = target; parent_[cur] != -1; cur = parent_[cur]) {
+      path_edges.push_back(parent_edge_[cur]);
+    }
+    reverse(path_edges.begin(), path_edges.end());
+    return path_edges;
+  }
+};
+
+// --- 簡易呼び出し関数 ---
+template <typename W = long long>
+inline vector<long long>
+zero_one_bfs(const vector<vector<pair<int, W>>> &g, int start = 0) {
+  ZeroOneBFS<long long> bfs(g);
+  return bfs.run(start);
+}
+
+template <typename W = long long>
+inline vector<long long>
+zero_one_bfs(const vector<vector<pair<int, W>>> &g, const vector<int> &starts) {
+  ZeroOneBFS<long long> bfs(g);
+  return bfs.run(starts);
+}
+
+template <typename W = long long>
+inline pair<vector<long long>, vector<int>>
+zero_one_bfs_with_path(const vector<vector<pair<int, W>>> &g, int start = 0) {
+  int n = (int)g.size();
+  vector<long long> dist(n, -1);
+  vector<int> prev_node(n, -1);
+  if (n == 0)
+    return {dist, prev_node};
+  assert(0 <= start && start < n);
+
+  deque<pair<long long, int>> todo;
+  dist[start] = 0;
+  todo.push_back({0, start});
+
+  while (!todo.empty()) {
+    auto [c, u] = todo.front();
+    todo.pop_front();
+    if (c != dist[u])
+      continue;
+    for (const auto &edge : g[u]) {
+      int to = edge.first;
+      int w = (int)edge.second;
+      assert(w == 0 || w == 1);
+      long long nc = c + w;
+      if (dist[to] == -1 || nc < dist[to]) {
+        dist[to] = nc;
+        prev_node[to] = u;
+        if (w == 0)
+          todo.push_front({nc, to});
+        else
+          todo.push_back({nc, to});
+      }
+    }
+  }
+  return {dist, prev_node};
+}
+
+// --- グリッド版 01-BFS ---
+// step_cost(x, y, nx, ny) -> int: 0 (push_front), 1 (push_back), -1 (通行不可)
+template <typename T = long long, typename StepCost>
+inline vector<vector<T>> zero_one_bfs_grid(int h, int w,
+                                           const vector<pair<int, int>> &starts,
+                                           StepCost step_cost, int dirs = 4) {
+  assert(h >= 0 && w >= 0);
+  assert(dirs == 4 || dirs == 8);
+  vector<vector<T>> dist(h, vector<T>(w, (T)-1));
+  if (h == 0 || w == 0)
+    return dist;
+
+  static constexpr int dx8[8] = {1, 0, -1, 0, 1, 1, -1, -1};
+  static constexpr int dy8[8] = {0, 1, 0, -1, 1, -1, 1, -1};
+
+  deque<pair<T, pair<int, int>>> todo;
+  for (auto [sx, sy] : starts) {
+    assert(0 <= sx && sx < h && 0 <= sy && sy < w);
+    if (dist[sx][sy] == (T)-1) {
+      dist[sx][sy] = 0;
+      todo.push_back({(T)0, {sx, sy}});
+    }
+  }
+
+  while (!todo.empty()) {
+    auto [c, pos] = todo.front();
+    auto [x, y] = pos;
+    todo.pop_front();
+    if (c != dist[x][y])
+      continue;
+
+    for (int k = 0; k < dirs; ++k) {
+      int nx = x + dx8[k];
+      int ny = y + dy8[k];
+      if (nx < 0 || nx >= h || ny < 0 || ny >= w)
+        continue;
+      int w_step = (int)step_cost(x, y, nx, ny);
+      if (w_step < 0)
+        continue;
+      assert(w_step == 0 || w_step == 1);
+      T nc = c + (T)w_step;
+      if (dist[nx][ny] == (T)-1 || nc < dist[nx][ny]) {
+        dist[nx][ny] = nc;
+        if (w_step == 0)
+          todo.push_front({nc, {nx, ny}});
+        else
+          todo.push_back({nc, {nx, ny}});
+      }
+    }
+  }
+  return dist;
+}
+
+template <typename T = long long, typename StepCost>
+inline vector<vector<T>> zero_one_bfs_grid(int h, int w, pair<int, int> start,
+                                           StepCost step_cost, int dirs = 4) {
+  return zero_one_bfs_grid<T>(h, w, vector<pair<int, int>>{start}, step_cost,
+                              dirs);
+}
+
+// 文字グリッド版 (cost0_ch への移動はコスト 0、それ以外はコスト 1、blocked_ch は進入不可)
+inline vector<vector<long long>>
+zero_one_bfs_grid(const vector<string> &grid, pair<int, int> start,
+                  char cost0_ch = '.', char blocked_ch = '\0', int dirs = 4) {
+  int h = (int)grid.size();
+  int w = (h == 0) ? 0 : (int)grid[0].size();
+  auto step_cost = [&](int, int, int nx, int ny) -> int {
+    char ch = grid[nx][ny];
+    if (blocked_ch != '\0' && ch == blocked_ch)
+      return -1;
+    return (ch == cost0_ch) ? 0 : 1;
+  };
+  return zero_one_bfs_grid<long long>(h, w, start, step_cost, dirs);
 }
 ```
 
@@ -6523,9 +7574,9 @@ private:
 </details>
 
 #### EulerTour (オイラーツアー・LCA)
-木構造を平坦化し、部分木クエリを区間クエリに変換する構造体です。内蔵の Sparse Table により、LCA（最小共通祖先）や頂点間距離を $O(1)$ で取得可能です。
+木構造を平坦化し、部分木クエリおよび根からのパス和クエリを区間クエリに変換する構造体です。サイズ $N$ の部分木半開区間 `[in[u], out[u])` に加え、行きがけ・帰りがけ両方で時刻を進めるサイズ $2N$ 用配列 `in2, out2`（`path_indices(u)`）を搭載し、1点更新＋パス和取得にも対応します。また内蔵の Sparse Table により LCA や頂点間距離を $O(1)$ で取得可能です。
 - **ファイル**: `mylib/EulerTour.hpp`
-- **計算量**: 構築 $O(N \log N)$、部分木範囲 $O(1)$、LCA・距離取得 $O(1)$、祖先判定 $O(1)$
+- **計算量**: 構築 $O(N \log N)$、部分木範囲・パス寄与インデックス $O(1)$、LCA・距離取得 $O(1)$、祖先判定 $O(1)$
 
 ```cpp
 #include "mylib/EulerTour.hpp"
@@ -6539,19 +7590,19 @@ et.add_edge(1, 4);
 
 et.build(0); // 根を 0 として構築
 
-// 部分木 u に対応する半開区間 [l, r)
-auto [l, r] = et.subtree_range(1); // BIT やセグ木に乗せて部分木更新・取得
+// 1. 部分木クエリ (サイズ n)
+auto [l, r] = et.subtree_range(1); // 半開区間 [in[u], out[u])
+int sz = et.subtree_size(1);       // 3
 
-// 部分木のサイズ
-int sz = et.subtree_size(1); // 3
+// 2. 根からのパス和クエリ (1点更新 + パス和取得, BIT サイズ 2*n)
+// atcoder::fenwick_tree<long long> bit(2 * n);
+auto [in_i, out_i] = et.path_indices(u);          // {in2[u], out2[u]}
+bit.add(in_i, val[u]); bit.add(out_i, -val[u]);   // 寄与の追加/更新
+long long root_path = bit.sum(0, et.in2[v] + 1);  // 根から v までの頂点重み和
 
-// LCA (最小共通祖先)
-int anc = et.lca(3, 4); // 1
-
-// 頂点間距離 (辺数)
-int d = et.dist(3, 2); // 3
-
-// 祖先判定
+// 3. LCA・距離・祖先判定
+int anc = et.lca(3, 4);         // 1
+int d = et.dist(3, 2);          // 3
 bool ok = et.is_ancestor(0, 3); // true
 ```
 
@@ -6560,51 +7611,107 @@ bool ok = et.is_ancestor(0, 3); // true
 
 ```cpp
 #pragma once
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <cassert>
+#include <utility>
+#include <vector>
 
 using namespace std;
+
+// ============================================================================
+// 木のオイラーツアー (Euler Tour)
+// ============================================================================
+// ・木構造を DFS で巡回し、訪問時刻の配列に平坦化する。
+// ・部分木 u の頂点は訪問時刻の半開区間 [in[u], out[u]) に一対一対応する (サイズ n)。
+// ・行きがけと帰りがけの両方で進める時刻 in2, out2 (範囲 [0, 2*n)) も同時に記録する。
+//   - 部分木クエリ: subtree_range(u) = {in[u], out[u]} (サイズ n)
+//   - 根からのパス和クエリ: path_indices(u) = {in2[u], out2[u]} (サイズ 2*n の BIT / セグ木用)
+// ・BIT やセグ木と組み合わせることで、部分木加算/和・1点更新+パス和取得が O(log N) で可能。
+// ・内蔵の Sparse Table により、LCA (最小共通祖先) や頂点間距離を O(1) で取得可能。
+//
+// 使用例:
+//   EulerTour et(n);
+//   et.add_edge(u, v);
+//   et.build(root); // デフォルト root = 0
+//
+//   // 1. 部分木クエリ (サイズ n)
+//   auto [l, r] = et.subtree_range(u); // 部分木 u の半開区間 [in[u], out[u])
+//
+//   // 2. 根からのパス和クエリ (1点更新 + パス和取得, BIT サイズ 2*n)
+//   // atcoder::fenwick_tree<long long> bit(2 * n);
+//   auto [in_i, out_i] = et.path_indices(u);          // {in2[u], out2[u]}
+//   bit.add(in_i, val[u]); bit.add(out_i, -val[u]);   // 頂点 u に +val[u] を寄与させる (更新も +delta, -delta)
+//   long long path_sum = bit.sum(0, et.in2[v] + 1);   // 根から頂点 v までのパス上の総和
+//
+//   // 3. LCA・距離 (O(1))
+//   int a = et.lca(u, v);              // LCA (最小共通祖先)
+//   int d = et.dist(u, v);             // 2頂点間の最短距離 (辺数)
+// ============================================================================
 
 struct EulerTour {
   int n;
   vector<vector<int>> g;
   vector<int> in, out;     // 部分木 u に対応する区間 [in[u], out[u]) (サイズ n)
   vector<int> tour;        // 訪問時刻順の頂点列 (サイズ n)
+  vector<int> in2, out2;   // 行きがけ・帰りがけ両方で +1 する時刻 (値の範囲 [0, 2*n))
   vector<int> depth;       // 各頂点の深さ (根は 0)
   vector<int> parent;      // 親頂点 (根は -1)
 
+  // LCA 用データ (Sparse Table on Euler Tour of size 2*N-1)
   vector<int> node_visit;  // 頂点訪問履歴 (サイズ 2*n - 1)
   vector<int> first_visit; // 各頂点が node_visit に最初に現れるインデックス
-  vector<vector<int>> st;  // Sparse Table
+  vector<vector<int>> st;  // Sparse Table (深さが最小となる node_visit のインデックスを保持)
 
   EulerTour(int n = 0)
-      : n(n), g(n), in(n), out(n), tour(n), depth(n, 0), parent(n, -1),
-        first_visit(n, 0) {}
+      : n(n), g(n), in(n), out(n), tour(n), in2(n), out2(n), depth(n, 0),
+        parent(n, -1), first_visit(n, 0) {}
 
+  // 無向辺を追加 (0-indexed)
   void add_edge(int u, int v) {
     g[u].push_back(v);
     g[v].push_back(u);
   }
 
+  // 根を指定してオイラーツアーおよび LCA 構造を構築 (デフォルト root = 0)
   void build(int root = 0) {
-    int timer = 0;
+    if (n == 0)
+      return;
+    assert(0 <= root && root < n);
+    int timer = 0, timer2 = 0;
+    in.assign(n, 0);
+    out.assign(n, 0);
+    tour.assign(n, 0);
+    in2.assign(n, 0);
+    out2.assign(n, 0);
+    depth.assign(n, 0);
+    parent.assign(n, -1);
     node_visit.clear();
     node_visit.reserve(2 * n);
-    dfs(root, -1, 0, timer);
+    dfs(root, -1, 0, timer, timer2);
     build_lca();
   }
 
+  // 部分木 u に対応する半開区間 [l, r) を取得
   pair<int, int> subtree_range(int u) const {
     return {in[u], out[u]};
   }
 
+  // 頂点 u のパス寄与更新用インデックス {in2[u], out2[u]} (値の範囲 [0, 2*N)) を取得
+  pair<int, int> path_indices(int u) const {
+    return {in2[u], out2[u]};
+  }
+
+  // 部分木 u のサイズを取得
   int subtree_size(int u) const {
     return out[u] - in[u];
   }
 
+  // u が v の祖先 (u == v 含む) かどうか判定
   bool is_ancestor(int u, int v) const {
     return in[u] <= in[v] && out[v] <= out[u];
   }
 
+  // u と v の最小共通祖先 (LCA) を O(1) で取得
   int lca(int u, int v) const {
     int l = first_visit[u], r = first_visit[v];
     if (l > r)
@@ -6617,17 +7724,21 @@ struct EulerTour {
                                                              : node_visit[idx2];
   }
 
+  // 頂点 u と v の最短距離 (辺数) を O(1) で取得
   int dist(int u, int v) const {
     return depth[u] + depth[v] - 2 * depth[lca(u, v)];
   }
 
 private:
-  void dfs(int u, int p, int d, int &timer) {
+  void dfs(int u, int p, int d, int &timer, int &timer2) {
     parent[u] = p;
     depth[u] = d;
     in[u] = timer;
     tour[timer] = u;
     timer++;
+
+    in2[u] = timer2;
+    timer2++;
 
     first_visit[u] = node_visit.size();
     node_visit.push_back(u);
@@ -6635,10 +7746,12 @@ private:
     for (int v : g[u]) {
       if (v == p)
         continue;
-      dfs(v, u, d + 1, timer);
+      dfs(v, u, d + 1, timer, timer2);
       node_visit.push_back(u);
     }
     out[u] = timer;
+    out2[u] = timer2;
+    timer2++;
   }
 
   void build_lca() {
@@ -6832,6 +7945,266 @@ using LCA = LowestCommonAncestor<long long>;
 
 </details>
 
+---
+
+#### TreeDiameter (木の直径・パス復元・中心・最遠点距離)
+2 回の探索により木の直径（最遠点対間距離）、直径の両端点 $u, v$、直径パス頂点列、木の中心（1〜2 頂点）、および任意頂点からの最遠点距離 `eccentricity(x)` を $O(N)$ で求めます。負重みを含む木の最長単純パスに対応する `build_allow_negative()` も備えています。
+- **ファイル**: `mylib/TreeDiameter.hpp`
+- **計算量**: $O(N)$
+
+```cpp
+#include "mylib/TreeDiameter.hpp"
+
+TreeDiameter<long long> td(n);
+td.add_edge(u, v, cost);
+td.build();
+
+long long d = td.diameter;
+auto centers = td.get_centers();     // 直径パスの中央頂点 (1〜2個)
+long long far = td.eccentricity(x);  // 頂点 x から最遠頂点までの距離
+// td.path に u -> ... -> v の頂点列が格納される
+```
+
+<details>
+<summary><b>ソースコードを展開 (TreeDiameter.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <queue>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+using namespace std;
+
+// ============================================================================
+// 木の直径 (Tree Diameter - 任意非負重み対応・パス復元・中心・最遠点距離)
+// ============================================================================
+// ・2 回の BFS で木の最遠点対 (直径) を O(N) で求める。
+// ・辺の重みが非負の整数/実数 (省略時は重み 1) に対応。
+// ・直径の長さ、両端点 u, v、直径パス path (u -> ... -> v)、木の中心 (1〜2頂点)、
+//   任意頂点 x の最遠点距離 eccentricity(x) を取得可能。
+// ・負の重みを含む木の最長単純パス長が必要な場合は build_allow_negative() を使用。
+//
+// 使用例:
+//   TreeDiameter<long long> td(n);
+//   td.add_edge(u, v, cost);
+//   td.build();
+//   long long d = td.diameter;
+//   auto centers = td.get_centers();
+//   long long far_x = td.eccentricity(x); // 頂点 x から最も遠い頂点までの距離
+// ============================================================================
+
+template <typename T = long long> struct TreeDiameter {
+  struct Edge {
+    int to;
+    T cost;
+  };
+
+  int n;
+  vector<vector<Edge>> g;
+  T diameter;
+  int u, v;             // 直径の両端点
+  vector<int> path;     // 直径を構成する頂点列 (u -> ... -> v)
+  vector<T> dist_u;     // u から各頂点への距離
+  vector<T> dist_v;     // v から各頂点への距離
+
+  explicit TreeDiameter(int n = 0)
+      : n(n), g(n), diameter(0), u(0), v(0) {
+    assert(n >= 0);
+  }
+
+  explicit TreeDiameter(const vector<vector<pair<int, T>>> &adj)
+      : n((int)adj.size()), g(adj.size()), diameter(0), u(0), v(0) {
+    for (int from = 0; from < n; ++from) {
+      for (const auto &p : adj[from]) {
+        g[from].push_back({p.first, p.second});
+      }
+    }
+  }
+
+  // 無向辺の追加 (重みなしの場合は cost = 1)
+  void add_edge(int from, int to, T cost = 1) {
+    assert(0 <= from && from < n && 0 <= to && to < n);
+    g[from].push_back({to, cost});
+    g[to].push_back({from, cost});
+  }
+
+  // 2回の探索で直径・両端点・直径パス・端点からの距離配列を計算 (非負重み) O(N)
+  T build(int root = 0) {
+    if (n == 0) {
+      diameter = 0;
+      u = v = -1;
+      path.clear();
+      dist_u.clear();
+      dist_v.clear();
+      return 0;
+    }
+    assert(0 <= root && root < n);
+
+    auto [far_u, d1, p1, dist_dummy] = farthest(root);
+    (void)d1;
+    (void)p1;
+    (void)dist_dummy;
+    u = far_u;
+
+    auto [far_v, max_d, parent_v, du] = farthest(u);
+    v = far_v;
+    diameter = max_d;
+    dist_u = std::move(du);
+
+    auto [far_back, max_d2, parent_back, dv] = farthest(v);
+    (void)far_back;
+    (void)max_d2;
+    (void)parent_back;
+    dist_v = std::move(dv);
+
+    path.clear();
+    for (int cur = v; cur != -1; cur = parent_v[cur]) {
+      path.push_back(cur);
+    }
+    reverse(path.begin(), path.end());
+    return diameter;
+  }
+
+  T run(int root = 0) { return build(root); }
+
+  // 木の中心 (直径パスの中央に位置する 1 個または 2 個の頂点)
+  vector<int> get_centers() {
+    if (n == 0)
+      return {};
+    if (path.empty())
+      build();
+    int sz = (int)path.size();
+    if (sz % 2 == 1) {
+      return {path[sz / 2]};
+    } else {
+      return {path[sz / 2 - 1], path[sz / 2]};
+    }
+  }
+
+  // 任意の頂点 x から最も遠い頂点までの距離 O(1) (全頂点の木の高さ)
+  T eccentricity(int x) const {
+    assert(0 <= x && x < n);
+    assert(!dist_u.empty() && !dist_v.empty());
+    return max(dist_u[x], dist_v[x]);
+  }
+
+  // 任意の頂点 x から最も遠い端点 (u または v) O(1)
+  int farthest_vertex(int x) const {
+    assert(0 <= x && x < n);
+    assert(!dist_u.empty() && !dist_v.empty());
+    return (dist_u[x] >= dist_v[x]) ? u : v;
+  }
+
+  // 負の重みを含む木の最長単純パス長を計算し diameter, u, v, path を更新する O(N)
+  T build_allow_negative(int root = 0) {
+    if (n == 0) {
+      diameter = 0;
+      u = v = -1;
+      path.clear();
+      return 0;
+    }
+    assert(0 <= root && root < n);
+    diameter = 0;
+    u = v = root;
+
+    // {深さ最大値, 端点}
+    auto dfs = [&](auto &self, int cur, int par) -> pair<T, int> {
+      T best1_d = 0, best2_d = 0;
+      int best1_v = cur, best2_v = cur;
+      for (const auto &e : g[cur]) {
+        if (e.to == par)
+          continue;
+        auto [cd, cv] = self(self, e.to, cur);
+        T cand_d = cd + e.cost;
+        if (cand_d > best1_d) {
+          best2_d = best1_d;
+          best2_v = best1_v;
+          best1_d = cand_d;
+          best1_v = cv;
+        } else if (cand_d > best2_d) {
+          best2_d = cand_d;
+          best2_v = cv;
+        }
+      }
+      if (best1_d + best2_d >= diameter) {
+        diameter = best1_d + best2_d;
+        u = best1_v;
+        v = best2_v;
+      }
+      return {best1_d, best1_v};
+    };
+    dfs(dfs, root, -1);
+
+    // u -> v パス復元 (u から親を記録)
+    vector<int> par_u(n, -1);
+    vector<uint8_t> vis(n, 0);
+    queue<int> q;
+    vis[u] = 1;
+    q.push(u);
+    while (!q.empty()) {
+      int cur = q.front();
+      q.pop();
+      if (cur == v)
+        break;
+      for (const auto &e : g[cur]) {
+        if (!vis[e.to]) {
+          vis[e.to] = 1;
+          par_u[e.to] = cur;
+          q.push(e.to);
+        }
+      }
+    }
+    path.clear();
+    for (int cur = v; cur != -1; cur = par_u[cur]) {
+      path.push_back(cur);
+    }
+    reverse(path.begin(), path.end());
+    return diameter;
+  }
+
+private:
+  tuple<int, T, vector<int>, vector<T>> farthest(int start) const {
+    vector<T> dist(n, 0);
+    vector<uint8_t> vis(n, 0);
+    vector<int> parent(n, -1);
+    queue<int> que;
+
+    vis[start] = 1;
+    dist[start] = 0;
+    que.push(start);
+
+    int far_node = start;
+    T max_dist = 0;
+
+    while (!que.empty()) {
+      int cur = que.front();
+      que.pop();
+
+      if (dist[cur] > max_dist) {
+        max_dist = dist[cur];
+        far_node = cur;
+      }
+
+      for (const auto &e : g[cur]) {
+        if (!vis[e.to]) {
+          vis[e.to] = 1;
+          dist[e.to] = dist[cur] + e.cost;
+          parent[e.to] = cur;
+          que.push(e.to);
+        }
+      }
+    }
+    return {far_node, max_dist, std::move(parent), std::move(dist)};
+  }
+};
+```
+
+</details>
 ---
 
 ### 4. 数学・数論 (Math & Number Theory)
@@ -7553,6 +8926,203 @@ inline vector<long long> segmented_sieve(long long L, long long R) {
 
 </details>
 
+---
+
+#### OsakSieve (osa_k法・最小素因数SPF高速素因数分解)
+最小素因数 (SPF) テーブル `min_factor` を線形篩 $O(N)$ で前計算し、素数判定・素因数分解 `{素数, 指数}`・重複なし素因数リスト・約数列挙・約数個数/総和・オイラーの $\varphi$ 関数・メビウス関数を高速（$O(\log X)$）に計算する構造体です。
+- **ファイル**: `mylib/OsakSieve.hpp`
+- **計算量**: 前計算 $O(N)$、素因数分解クエリ $O(\log X)$
+
+```cpp
+#include "mylib/OsakSieve.hpp"
+
+OsakSieve sieve(1000000);
+bool p = sieve.is_prime(97);        // true
+auto fac = sieve.factorize(72);     // {{2, 3}, {3, 2}}
+auto pf = sieve.prime_factors(72);  // {2, 3}
+auto divs = sieve.divisors(72);     // {1, 2, 3, ..., 72}
+```
+
+<details>
+<summary><b>ソースコードを展開 (OsakSieve.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <algorithm>
+#include <cassert>
+#include <utility>
+#include <vector>
+
+using namespace std;
+
+// ============================================================================
+// osa_k法 (最小素因数 SPF による高速素因数分解・約数列挙)
+// ============================================================================
+// ・前計算 O(N) の線形篩で最小素因数 (SPF) テーブル min_factor[x] を構築し、
+//   クエリごとの素因数分解を O(log X) で行う。
+// ・x <= max_val の範囲で素数判定・素因数分解 {素数, 指数}・約数列挙・
+//   約数個数/総和・オイラーの phi 関数・メビウス関数を提供。
+//
+// 使用例:
+//   OsakSieve sieve(1000000);
+//   bool p = sieve.is_prime(998244353 <= 1000000 ? 97 : 2);
+//   auto fac = sieve.factorize(72);      // {{2, 3}, {3, 2}}
+//   auto pf  = sieve.prime_factors(72);  // {2, 3}
+//   auto div = sieve.divisors(72);       // {1, 2, 3, 4, 6, 8, 9, 12, 18, 24, 36, 72}
+// ============================================================================
+
+struct OsakSieve {
+  int max_val;
+  vector<int> min_factor;
+  vector<int> primes;
+
+  OsakSieve() : max_val(0), min_factor(1, 0) {}
+  explicit OsakSieve(int n) : max_val(n), min_factor(n + 1, 0) {
+    assert(n >= 0);
+    if (n >= 1)
+      min_factor[1] = 1;
+    // 線形篩 O(N) で最小素因数を計算
+    for (int i = 2; i <= n; ++i) {
+      if (min_factor[i] == 0) {
+        min_factor[i] = i;
+        primes.push_back(i);
+      }
+      for (int p : primes) {
+        if (p > min_factor[i] || (long long)i * p > n)
+          break;
+        min_factor[i * p] = p;
+      }
+    }
+  }
+
+  // 素数判定 (x <= max_val) O(1)
+  bool is_prime(int x) const {
+    if (x < 2 || x > max_val)
+      return false;
+    return min_factor[x] == x;
+  }
+
+  // 最小素因数 (SPF) を取得 O(1)
+  int spf(int x) const {
+    assert(1 <= x && x <= max_val);
+    return min_factor[x];
+  }
+
+  // 素因数分解: {素因数, 指数} の昇順リスト O(log x)
+  vector<pair<int, int>> factorize(int x) const {
+    assert(1 <= x && x <= max_val);
+    vector<pair<int, int>> res;
+    while (x > 1) {
+      int p = min_factor[x];
+      int exp = 0;
+      while (min_factor[x] == p) {
+        x /= p;
+        exp++;
+      }
+      res.push_back({p, exp});
+    }
+    return res;
+  }
+
+  // 素因数列 (重複あり昇順) O(log x)
+  vector<int> factorize_list(int x) const {
+    assert(1 <= x && x <= max_val);
+    vector<int> res;
+    while (x > 1) {
+      res.push_back(min_factor[x]);
+      x /= min_factor[x];
+    }
+    return res;
+  }
+
+  // 素因数のみのリスト (重複なし昇順) O(log x)
+  vector<int> prime_factors(int x) const {
+    assert(1 <= x && x <= max_val);
+    vector<int> res;
+    while (x > 1) {
+      int p = min_factor[x];
+      res.push_back(p);
+      while (x % p == 0)
+        x /= p;
+    }
+    return res;
+  }
+
+  // 約数列挙 (昇順ソート済み)
+  vector<int> divisors(int x) const {
+    assert(1 <= x && x <= max_val);
+    auto factors = factorize(x);
+    vector<int> divs = {1};
+    for (auto [p, exp] : factors) {
+      int sz = (int)divs.size();
+      int cur = 1;
+      for (int i = 0; i < exp; ++i) {
+        cur *= p;
+        for (int j = 0; j < sz; ++j) {
+          divs.push_back(divs[j] * cur);
+        }
+      }
+    }
+    sort(divs.begin(), divs.end());
+    return divs;
+  }
+
+  // 約数の個数 d(x) O(log x)
+  int count_divisors(int x) const {
+    auto factors = factorize(x);
+    int ans = 1;
+    for (auto [p, exp] : factors) {
+      (void)p;
+      ans *= (exp + 1);
+    }
+    return ans;
+  }
+
+  // 約数の総和 sigma(x) O(log x)
+  long long sum_divisors(int x) const {
+    auto factors = factorize(x);
+    long long ans = 1;
+    for (auto [p, exp] : factors) {
+      long long cur = 1, mult = 1;
+      for (int i = 0; i < exp; ++i) {
+        mult *= p;
+        cur += mult;
+      }
+      ans *= cur;
+    }
+    return ans;
+  }
+
+  // オイラーのトーシェント関数 phi(x) O(log x)
+  int euler_phi(int x) const {
+    assert(1 <= x && x <= max_val);
+    int ans = x;
+    while (x > 1) {
+      int p = min_factor[x];
+      ans -= ans / p;
+      while (x % p == 0)
+        x /= p;
+    }
+    return ans;
+  }
+
+  // メビウス関数 mu(x) O(log x)
+  int moebius(int x) const {
+    assert(1 <= x && x <= max_val);
+    int mu = 1;
+    while (x > 1) {
+      int p = min_factor[x];
+      x /= p;
+      if (x % p == 0)
+        return 0;
+      mu = -mu;
+    }
+    return mu;
+  }
+};
+```
+
+</details>
 ---
 
 #### BiCoef (二項係数・順列・重複組合せ)
@@ -8500,6 +10070,382 @@ inline Real convex_diameter(const Polygon &P) {
 
 ---
 
+### 6. 探索・最適化 (Search & Optimization)
+
+#### TernarySearch (三分探索)
+下に凸・上に凸な単峰性関数の極値（最小値・最大値）を求める実数版・安全設計整数版の三分探索ライブラリです。整数オーバーフロー防止および微小幅での線形全探索フォールバックを備えています。
+- **ファイル**: `mylib/TernarySearch.hpp`
+- **計算量**: 実数 $O(\text{iter})$、整数 $O(\log_{1.5}(R - L))$
+
+```cpp
+#include "mylib/TernarySearch.hpp"
+
+// 実数版 (下に凸の最小値 / 上に凸の最大値)
+double x_real = ternary_search_real(0.0, 10.0, [&](double x) {
+    return (x - 2.5) * (x - 2.5) + 10.0;
+});
+double x_max_real = ternary_search_max_real(-10.0, 10.0, f_concave);
+
+// 整数版 ([low, high] で最小値をとる x / {x, min_val} ペア取得)
+long long x_int = ternary_search_int(-100LL, 100LL, [&](long long x) {
+    return (x - 7) * (x - 7) + 3;
+});
+auto [best_x, best_val] = ternary_search_min_pair_int(-100LL, 100LL, f_int);
+```
+
+<details>
+<summary><b>ソースコードを展開 (TernarySearch.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <cassert>
+#include <type_traits>
+#include <utility>
+
+using namespace std;
+
+// ============================================================================
+// 三分探索 (Ternary Search)
+// ============================================================================
+// ・下に凸 / 上に凸な単峰性関数 f(x) の極値 (最小値/最大値) を探索する。
+// ・実数版: 反復回数固定 (デフォルト 100 回、精度 ~ (2/3)^100 ≈ 2.4e-18)。
+// ・整数版: 幅が 2 以下になるまで 3 分割し、残った数点を全探索して境界バグを防止。
+//
+// 使用例:
+//   double x = ternary_search_real(0.0, 10.0, [&](double x) { return (x - 2.5) * (x - 2.5); });
+//   long long k = ternary_search_int(-100LL, 100LL, [&](long long x) { return (x - 7) * (x - 7); });
+// ============================================================================
+
+// --- 1. 実数版 (最小値) ---
+template <typename T1, typename T2, typename F>
+inline auto ternary_search_real(T1 low_in, T2 high_in, F f, int iter = 100) {
+  using Real = common_type_t<T1, T2, double>;
+  Real low = (Real)low_in;
+  Real high = (Real)high_in;
+  assert(low <= high);
+  for (int i = 0; i < iter; ++i) {
+    Real m1 = low + (high - low) / (Real)3.0;
+    Real m2 = high - (high - low) / (Real)3.0;
+    if (f(m1) < f(m2)) {
+      high = m2;
+    } else {
+      low = m1;
+    }
+  }
+  return (low + high) / (Real)2.0;
+}
+
+template <typename T1, typename T2, typename F>
+inline auto ternary_search_min_pair_real(T1 low_in, T2 high_in, F f,
+                                         int iter = 100) {
+  auto x = ternary_search_real(low_in, high_in, f, iter);
+  return make_pair(x, f(x));
+}
+
+// --- 2. 実数版 (最大値・上に凸) ---
+template <typename T1, typename T2, typename F>
+inline auto ternary_search_max_real(T1 low_in, T2 high_in, F f,
+                                    int iter = 100) {
+  using Real = common_type_t<T1, T2, double>;
+  Real low = (Real)low_in;
+  Real high = (Real)high_in;
+  assert(low <= high);
+  for (int i = 0; i < iter; ++i) {
+    Real m1 = low + (high - low) / (Real)3.0;
+    Real m2 = high - (high - low) / (Real)3.0;
+    if (f(m1) > f(m2)) {
+      high = m2;
+    } else {
+      low = m1;
+    }
+  }
+  return (low + high) / (Real)2.0;
+}
+
+template <typename T1, typename T2, typename F>
+inline auto ternary_search_max_pair_real(T1 low_in, T2 high_in, F f,
+                                         int iter = 100) {
+  auto x = ternary_search_max_real(low_in, high_in, f, iter);
+  return make_pair(x, f(x));
+}
+
+// --- 3. 整数版 (最小値) ---
+template <typename Int1, typename Int2, typename F>
+inline auto ternary_search_min_pair_int(Int1 low_in, Int2 high_in, F f) {
+  using Int = common_type_t<Int1, Int2>;
+  Int low = (Int)low_in;
+  Int high = (Int)high_in;
+  assert(low <= high);
+  while ((__int128)high - (__int128)low > 2) {
+    __int128 d = ((__int128)high - (__int128)low) / 3;
+    Int m1 = (Int)((__int128)low + d);
+    Int m2 = (Int)((__int128)high - d);
+    if (f(m1) < f(m2)) {
+      high = m2;
+    } else {
+      low = m1;
+    }
+  }
+  Int best_x = low;
+  auto best_val = f(low);
+  for (Int x = low + 1; x <= high; ++x) {
+    auto val = f(x);
+    if (val < best_val) {
+      best_val = val;
+      best_x = x;
+    }
+  }
+  return make_pair(best_x, best_val);
+}
+
+template <typename Int1, typename Int2, typename F>
+inline auto ternary_search_int(Int1 low_in, Int2 high_in, F f) {
+  return ternary_search_min_pair_int(low_in, high_in, f).first;
+}
+
+// --- 4. 整数版 (最大値・上に凸) ---
+template <typename Int1, typename Int2, typename F>
+inline auto ternary_search_max_pair_int(Int1 low_in, Int2 high_in, F f) {
+  using Int = common_type_t<Int1, Int2>;
+  Int low = (Int)low_in;
+  Int high = (Int)high_in;
+  assert(low <= high);
+  while ((__int128)high - (__int128)low > 2) {
+    __int128 d = ((__int128)high - (__int128)low) / 3;
+    Int m1 = (Int)((__int128)low + d);
+    Int m2 = (Int)((__int128)high - d);
+    if (f(m1) > f(m2)) {
+      high = m2;
+    } else {
+      low = m1;
+    }
+  }
+  Int best_x = low;
+  auto best_val = f(low);
+  for (Int x = low + 1; x <= high; ++x) {
+    auto val = f(x);
+    if (val > best_val) {
+      best_val = val;
+      best_x = x;
+    }
+  }
+  return make_pair(best_x, best_val);
+}
+
+template <typename Int1, typename Int2, typename F>
+inline auto ternary_search_max_int(Int1 low_in, Int2 high_in, F f) {
+  return ternary_search_max_pair_int(low_in, high_in, f).first;
+}
+```
+
+</details>
+
+---
+
+#### GoldenSectionSearch (黄金分割探索・フィボナッチ探索)
+単峰性関数の極値を探索する際、前回評価した関数値を再利用することで 1 ステップあたりの関数呼び出しを **1 回のみ** に抑える高速極値探索ライブラリです（三分探索比で呼び出し回数を約 40〜50% 削減）。整数版では厳密なフィボナッチ探索を用い、評価済み整数を再評価しません。
+- **ファイル**: `mylib/GoldenSectionSearch.hpp`
+- **計算量**: 反復 $K$ 回で関数評価 $K + 2$ 回（整数版は $O(\log_\phi(R - L))$ 回評価）
+
+```cpp
+#include "mylib/GoldenSectionSearch.hpp"
+
+// 実数版 (重い評価関数の最小化・最大化に最適)
+double opt_x = golden_section_search_real(-10.0, 10.0, heavy_f, 80);
+auto [xmax, vmax] = golden_section_search_max_pair_real(-10.0, 10.0, f_concave, 80);
+
+// 整数版 (フィボナッチ探索・重み付き重複評価なし)
+long long k_opt = golden_section_search_int(0LL, 1000000LL, f_int);
+auto [kx, kv] = golden_section_search_min_pair_int(0LL, 1000000LL, f_int);
+```
+
+<details>
+<summary><b>ソースコードを展開 (GoldenSectionSearch.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <cassert>
+#include <cmath>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+using namespace std;
+
+// ============================================================================
+// 黄金分割探索 / フィボナッチ探索 (Golden Section Search)
+// ============================================================================
+// ・三分探索と同じく単峰性関数の極値を求めるが、前回計算した評価値を再利用することで
+//   各ステップの関数呼び出し回数を「1回」に抑える (関数評価コストを約 40〜50% 削減)。
+// ・整数版では厳密な離散版であるフィボナッチ探索を用い、すべての整数点を最大 1 回のみ評価する。
+//
+// 使用例:
+//   double x = golden_section_search_real(-10.0, 10.0, f, 80);
+//   long long k = golden_section_search_int(0LL, 1000000LL, f_int);
+// ============================================================================
+
+namespace gss_internal {
+
+template <typename Real, typename F, bool Maximize>
+inline auto run_real(Real low, Real high, F f, int iter) {
+  assert(low <= high);
+  const Real phi = ((Real)1.0 + sqrt((Real)5.0)) / (Real)2.0;
+  const Real r = (Real)1.0 / phi;
+
+  Real x1 = high - r * (high - low);
+  Real x2 = low + r * (high - low);
+  auto f1 = f(x1);
+  auto f2 = f(x2);
+
+  for (int i = 0; i < iter; ++i) {
+    bool go_left = Maximize ? (f1 > f2) : (f1 < f2);
+    if (go_left) {
+      high = x2;
+      x2 = x1;
+      f2 = f1;
+      x1 = high - r * (high - low);
+      f1 = f(x1);
+    } else {
+      low = x1;
+      x1 = x2;
+      f1 = f2;
+      x2 = low + r * (high - low);
+      f2 = f(x2);
+    }
+  }
+  return (low + high) / (Real)2.0;
+}
+
+template <typename Int, typename F, bool Maximize>
+inline auto run_int(Int low, Int high, F f) {
+  assert(low <= high);
+  __int128 n = (__int128)high - (__int128)low + 1;
+  if (n <= 1) {
+    return make_pair(low, f(low));
+  }
+
+  vector<__int128> fib = {0, 1, 1};
+  while (fib.back() < n + 1) {
+    fib.push_back(fib.back() + fib[fib.size() - 2]);
+  }
+
+  int k = (int)fib.size() - 1; // k >= 4
+  __int128 L = -1;
+  __int128 m1 = L + fib[k - 2];
+  __int128 m2 = L + fib[k - 1];
+
+  auto f1 = f((Int)((__int128)low + m1));
+  using Val = decltype(f1);
+  Val f2{};
+  bool has_f2 = (m2 < n);
+  if (has_f2) {
+    f2 = f((Int)((__int128)low + m2));
+  }
+
+  Int best_x = (Int)((__int128)low + m1);
+  Val best_val = f1;
+  if (has_f2) {
+    bool better = Maximize ? (f2 > best_val) : (f2 < best_val);
+    if (better) {
+      best_val = f2;
+      best_x = (Int)((__int128)low + m2);
+    }
+  }
+
+  while (k > 3) {
+    bool go_left = !has_f2 || (Maximize ? (f1 > f2) : (f1 < f2));
+    k--;
+    if (go_left) {
+      m2 = m1;
+      f2 = f1;
+      has_f2 = (m2 < n);
+      m1 = L + fib[k - 2];
+      if (k > 3) {
+        f1 = f((Int)((__int128)low + m1));
+        bool better = Maximize ? (f1 > best_val) : (f1 < best_val);
+        if (better) {
+          best_val = f1;
+          best_x = (Int)((__int128)low + m1);
+        }
+      }
+    } else {
+      L = m1;
+      m1 = m2;
+      f1 = f2;
+      m2 = L + fib[k - 1];
+      has_f2 = (m2 < n);
+      if (k > 3 && has_f2) {
+        f2 = f((Int)((__int128)low + m2));
+        bool better = Maximize ? (f2 > best_val) : (f2 < best_val);
+        if (better) {
+          best_val = f2;
+          best_x = (Int)((__int128)low + m2);
+        }
+      }
+    }
+  }
+  return make_pair(best_x, best_val);
+}
+
+} // namespace gss_internal
+
+// --- 1. 実数版 (最小値) ---
+template <typename T1, typename T2, typename F>
+inline auto golden_section_search_real(T1 low, T2 high, F f, int iter = 100) {
+  using Real = common_type_t<T1, T2, double>;
+  return gss_internal::run_real<Real, F, false>((Real)low, (Real)high, f, iter);
+}
+
+template <typename T1, typename T2, typename F>
+inline auto golden_section_search_min_pair_real(T1 low, T2 high, F f,
+                                                int iter = 100) {
+  auto x = golden_section_search_real(low, high, f, iter);
+  return make_pair(x, f(x));
+}
+
+// --- 2. 実数版 (最大値・上に凸) ---
+template <typename T1, typename T2, typename F>
+inline auto golden_section_search_max_real(T1 low, T2 high, F f,
+                                           int iter = 100) {
+  using Real = common_type_t<T1, T2, double>;
+  return gss_internal::run_real<Real, F, true>((Real)low, (Real)high, f, iter);
+}
+
+template <typename T1, typename T2, typename F>
+inline auto golden_section_search_max_pair_real(T1 low, T2 high, F f,
+                                                int iter = 100) {
+  auto x = golden_section_search_max_real(low, high, f, iter);
+  return make_pair(x, f(x));
+}
+
+// --- 3. 整数版 (最小値 / フィボナッチ探索) ---
+template <typename Int1, typename Int2, typename F>
+inline auto golden_section_search_min_pair_int(Int1 low, Int2 high, F f) {
+  using Int = common_type_t<Int1, Int2>;
+  return gss_internal::run_int<Int, F, false>((Int)low, (Int)high, f);
+}
+
+template <typename Int1, typename Int2, typename F>
+inline auto golden_section_search_int(Int1 low, Int2 high, F f) {
+  return golden_section_search_min_pair_int(low, high, f).first;
+}
+
+// --- 4. 整数版 (最大値・上に凸 / フィボナッチ探索) ---
+template <typename Int1, typename Int2, typename F>
+inline auto golden_section_search_max_pair_int(Int1 low, Int2 high, F f) {
+  using Int = common_type_t<Int1, Int2>;
+  return gss_internal::run_int<Int, F, true>((Int)low, (Int)high, f);
+}
+
+template <typename Int1, typename Int2, typename F>
+inline auto golden_section_search_max_int(Int1 low, Int2 high, F f) {
+  return golden_section_search_max_pair_int(low, high, f).first;
+}
+```
+
+</details>
+---
+
 ## 一括インクルード (All.hpp)
 
 全ライブラリを一括でインクルードするためのヘッダーファイルです。
@@ -8521,26 +10467,32 @@ inline Real convex_diameter(const Polygon &P) {
 #include "DynamicStringTreap.hpp"
 #include "EulerTour.hpp"
 #include "Geometry.hpp"
+#include "GoldenSectionSearch.hpp"
 #include "IntervalSet.hpp"
 #include "LazySqrtDecomposition.hpp"
 #include "LinearDiophantine.hpp"
 #include "LowestCommonAncestor.hpp"
 #include "Matrix.hpp"
+#include "MergeTechnique.hpp"
 #include "MosAlgorithm.hpp"
 #include "MultiDimensionalCumulativeSum.hpp"
 #include "NumberTheory.hpp"
 #include "OrderStatisticSet.hpp"
+#include "OsakSieve.hpp"
 #include "PersistentSegTree.hpp"
 #include "Prime.hpp"
 #include "Rerooting.hpp"
 #include "SegTree2D.hpp"
 #include "SparseTable.hpp"
 #include "SqrtDecomposition.hpp"
+#include "TernarySearch.hpp"
 #include "TopologicalSort.hpp"
+#include "TreeDiameter.hpp"
 #include "Trie.hpp"
 #include "TwoPointers.hpp"
 #include "UnionFind.hpp"
 #include "WeightedUnionFind.hpp"
+#include "ZeroOneBFS.hpp"
 #include "ZobristHash.hpp"
 ```
 

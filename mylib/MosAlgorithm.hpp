@@ -1,5 +1,7 @@
 #pragma once
-#include <bits/stdc++.h>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 using namespace std;
 
@@ -126,6 +128,14 @@ struct MosAlgorithm {
       }
       out(qry.id);
     }
+  }
+
+  // templates 互換エイリアス
+  template <typename AddL, typename AddR, typename DelL, typename DelR,
+            typename Out>
+  void run_lr(const AddL &add_l, const AddR &add_r, const DelL &del_l,
+              const DelR &del_r, const Out &out) {
+    run(add_l, add_r, del_l, del_r, out);
   }
 };
 
