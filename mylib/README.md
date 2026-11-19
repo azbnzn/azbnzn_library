@@ -39,6 +39,7 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
     - [Dijkstra (単一始点最短経路)](#dijkstra-単一始点最短経路)
     - [ZeroOneBFS (01-BFS・重み0/1最短経路)](#zeroonebfs-01-bfs重み01最短経路)
     - [BellmanFord (多機能ベルマンフォード法)](#bellmanford-多機能ベルマンフォード法)
+    - [DifferenceConstraints (差分制約系・牛ゲー)](#differenceconstraints-差分制約系牛ゲー)
     - [TopologicalSort (トポロジカルソート)](#topologicalsort-トポロジカルソート)
     - [Rerooting (全方位木DP)](#rerooting-全方位木dp)
     - [EulerTour (オイラーツアー・LCA)](#eulertour)
@@ -102,7 +103,8 @@ AtCoder Library (ACL) の設計思想を踏襲しつつ、ACL に含まれない
 | 複数文字列のプレフィックス検索・辞書 | `Trie` / `MapTrie<T>` | 挿入・検索 $O(|S|)$ | `Trie.hpp` |
 | 単一始点・多始点・グリッド最短経路・経路復元 | `dijkstra`, `Dijkstra<T>`, `dijkstra_grid` | $O((V + E) \log V)$ | `Dijkstra.hpp` |
 | 重み 0 / 1 のグラフ・グリッド最短経路 | `zero_one_bfs`, `ZeroOneBFS<T>`, `zero_one_bfs_grid` | $O(V + E)$ | `ZeroOneBFS.hpp` |
-| 負辺・最長路・SPFA・差分制約・最小平均閉路・Johnson APSP | `BellmanFord`, `DifferenceConstraints` | $O(VE)$ / $O(VE \log V)$ | `BellmanFord.hpp` |
+| 負辺・最長路・SPFA・最小平均閉路・Johnson APSP | `BellmanFord` | $O(VE)$ / $O(VE \log V)$ | `BellmanFord.hpp` |
+| 差分制約系（牛ゲー）・構成解・生距離配列/パス取得 | `DifferenceConstraints` | 非負辺 $O((V+E)\log V)$<br>負辺 $O(VE)$ | `DifferenceConstraints.hpp` |
 | 依存関係の順序付け・閉路検出・DAG判定 | `topological_sort` | $O(V + E)$ | `TopologicalSort.hpp` |
 | 木のすべての頂点を根としたときの木DP | `Rerooting<...>` | $O(N)$ | `Rerooting.hpp` |
 | 木の部分木クエリ・LCA・頂点間距離 | `EulerTour` | 構築 $O(N \log N)$<br>LCA $O(1)$ | `EulerTour.hpp` |
@@ -6129,7 +6131,7 @@ zero_one_bfs_grid(const vector<string> &grid, pair<int, int> start,
 ---
 
 #### BellmanFord (多機能ベルマンフォード法)
-負の重みを持つ有向・無向グラフに対する単一始点・多始点最短経路、到達可能な負閉路の影響を受ける頂点 (`-INF`) の厳密判定、最長経路 (`+INF` 判定)、SPFA、単純閉路の復元、辺数制約付き最短・最長路、最小/最大平均重み閉路 (Karp のアルゴリズム)、Johnson のポテンシャル・全点対最短経路 (APSP)、および差分制約系 (牛ゲー) を包括的に提供します。
+負の重みを持つ有向・無向グラフに対する単一始点・多始点最短経路、到達可能な負閉路の影響を受ける頂点 (`-INF`) の厳密判定、最長経路 (`+INF` 判定)、SPFA、単純閉路の復元、辺数制約付き最短・最長路、最小/最大平均重み閉路 (Karp のアルゴリズム)、および Johnson のポテンシャル・全点対最短経路 (APSP) を包括的に提供します。（差分制約系 / 牛ゲー専用ライブラリは [`DifferenceConstraints.hpp`](#differenceconstraints-差分制約系牛ゲー) として独立しています）
 - **ファイル**: `mylib/BellmanFord.hpp`
 - **計算量**:
   - ベルマンフォード法 (`run` / `run_max` / `run_all_sources`): $O(VE)$
@@ -6144,12 +6146,11 @@ zero_one_bfs_grid(const vector<string> &grid, pair<int, int> start,
   - 実行系 (最短路): `run(start)` / `run(starts)` / `run_all_sources()` / `run_with_init(init_dist)`
   - 実行系 (最長路): `run_max(start)` / `run_max(starts)` / `run_max_with_init(init_dist)`
   - 実行系 (SPFA): `run_spfa(start, find_all_unbounded = false)` / `run_spfa(starts, ...)` / `run_spfa_all_sources(...)` / `run_spfa_with_init(...)` / `run_spfa_max(...)`
-  - 状態・距離参照: `dist(v)` (`bf[v]`), `get_dist_optional(v)`, `is_reachable(v)`, `has_finite_dist(v)`, `is_neg_inf(v)`, `is_pos_inf(v)`, `has_negative_cycle()`, `has_positive_cycle()`, `get_unbounded_vertices()`
+  - 状態・距離参照: `dist(v)` (`bf[v]`), `get_dist_optional(v)`, `is_reachable(v)`, `has_finite_dist(v)`, `is_neg_inf(v)`, `is_pos_inf(v)`, `has_negative_cycle()`, `has_positive_cycle()`, `get_unbounded_vertices()`, `get_neg_inf_vertices()`
   - 経路・閉路復元: `get_path(t)`, `get_path_edges(t)`, `get_cycle()`, `get_cycle_edges()`, `find_negative_cycle(start)`, `find_any_negative_cycle()`
   - 辺数制約路: `shortest_path_at_most_k_edges(...)`, `shortest_path_exact_k_edges(...)`, `longest_path_at_most_k_edges(...)`, `longest_path_exact_k_edges(...)`
   - 平均重み閉路: `min_mean_cycle(reconstruct_cycle = true)`, `max_mean_cycle(...)` (`MeanCycleResult`: 整数重み時は既約分数 `num / den` で誤差なし比較可能、`cycle` / `cycle_edges` 復元付き)
   - グラフ操作・APSP: `reversed()`, `compute_potentials()`, `all_pairs_shortest_path()`
-- `DifferenceConstraints<T>` (差分制約系 / 牛ゲー): `add_diff_leq/geq/lt/gt/eq`, `add_bound_leq/geq/eq`, `add_range`, `is_feasible()`, `solve()`, `get_contradiction_cycle()`, `max_diff(u, v)`, `min_diff(u, v)`
 - `bellman_ford(g, start)`: `Dijkstra.hpp` と同じ隣接リスト形式から直接実行して `BellmanFord<T>` オブジェクトを返す簡易ラッパ
 
 **使用例:**
@@ -6173,16 +6174,6 @@ if (bf.is_neg_inf(target)) {
 auto mc = bf.min_mean_cycle(); // mc.has_cycle, mc.num, mc.den, mc.value, mc.cycle
 auto dist_k = bf.shortest_path_at_most_k_edges(0, 3);
 auto apsp = bf.all_pairs_shortest_path(); // 負閉路があれば nullopt
-
-// 3. 差分制約系 (牛ゲー): x_u - x_v <= w, x_u - x_v >= w, ...
-DifferenceConstraints<long long> dc(n);
-dc.add_diff_leq(1, 0, 5);   // x_1 - x_0 <= 5
-dc.add_diff_geq(2, 1, 3);   // x_2 - x_1 >= 3
-dc.add_range(0, 0, 10);     // 0 <= x_0 <= 10
-if (auto x = dc.solve()) {
-    // (*x)[0..n-1] がすべての制約を満たす実行可能解
-}
-auto diff = dc.max_diff(2, 0); // FINITE / INFEASIBLE / UNBOUNDED
 ```
 
 <details>
@@ -6206,14 +6197,14 @@ auto diff = dc.max_diff(2, 0); // FINITE / INFEASIBLE / UNBOUNDED
 using namespace std;
 
 // ============================================================================
-// 多機能ベルマンフォード法・SPFA・差分制約系・最小平均閉路ライブラリ (BellmanFord)
+// 多機能ベルマンフォード法・SPFA・最小平均閉路ライブラリ (BellmanFord)
 // ============================================================================
 // 【概要】
 // 負の重みを持つ有向/無向グラフに対する単一始点・多始点最短経路、負閉路検出と復元、
 // 到達可能な負閉路の影響を受ける頂点 (-INF) の厳密判定、最長経路 (+INF 判定対応)、
 // SPFA、辺数制約付き最短経路、最小/最大平均重み閉路 (Karp のアルゴリズム)、
-// Johnson のポテンシャル計算・全点対最短経路 (APSP)、差分制約系 (牛ゲー) を
-// ひとつのヘッダで網羅的に提供します。
+// Johnson のポテンシャル計算・全点対最短経路 (APSP) をひとつのヘッダで提供します。
+// (※ 差分制約系 / 牛ゲー専用ライブラリは DifferenceConstraints.hpp に独立)
 //
 // 【主な機能】
 // 1. BellmanFord<T> (デフォルト T = long long):
@@ -6231,11 +6222,7 @@ using namespace std;
 //    - グラフ反転・ポテンシャル・全点対最短路:
 //      reversed(), compute_potentials(), all_pairs_shortest_path()
 //
-// 2. DifferenceConstraints<T> (差分制約系 / 牛ゲー):
-//    - x_u - x_v <= w, >= w, < w, > w, == w や絶対範囲 low <= x_u <= high を記述可能
-//    - solve(), is_feasible(), get_contradiction_cycle(), max_diff(u, v), min_diff(u, v)
-//
-// 3. 簡易関数:
+// 2. 簡易関数:
 //    - bellman_ford(g, start): 隣接リストから即座に実行済みの BellmanFord を返す
 // ============================================================================
 
@@ -7134,40 +7121,496 @@ public:
 };
 
 // ============================================================================
-// 差分制約系ソルバー (System of Difference Constraints / 牛ゲー)
+// 隣接リストからの簡易呼び出し関数 (Dijkstra.hpp 互換スタイル)
 // ============================================================================
-// n 個の変数 x_0, ..., x_{n-1} に関する以下の線形不等式制約を管理・解決します:
-// - x_u - x_v <= w   <=>  辺 v -> u (重み w)
-// - x_u - x_v >= w   <=>  辺 u -> v (重み -w)
-// - x_u <= w, x_u >= w などの絶対値境界 (内部参照頂点 n を基準 x_n = 0 として管理)
+template <typename T = long long>
+inline BellmanFord<T> bellman_ford(const vector<vector<pair<int, T>>> &g,
+                                   int start = 0) {
+  BellmanFord<T> bf(g);
+  bf.run(start);
+  return bf;
+}
+```
+
+</details>
+
+---
+
+#### DifferenceConstraints (差分制約系・牛ゲー)
+$n$ 個の変数 $x_0, \dots, x_{n-1}$ に関する線形不等式制約（$x_u - x_v \le w$, $x_u - x_v \ge w$, 絶対範囲など）を最短経路問題に帰着して解く**牛ゲー専用ライブラリ**です。非負辺のみのときは自動的に Dijkstra で高速処理し、負辺を含むときは Bellman-Ford / SPFA に切り替わります。最小・最大の「値」だけでなく、**それを構成する変数配列 (`solution()`, `solve_min()`, `solve_max()`) や最短経路の生距離 (`dist()`, `dists()`)、根拠パス (`get_path()`)** までそのまま取得できます。
+- **ファイル**: `mylib/DifferenceConstraints.hpp`
+- **計算量**:
+  - 非負辺のみ: 実行可能判定 $O(1)$、最小・最大・構成解取得 $O((V + E) \log V)$ (自動 Dijkstra)
+  - 負辺あり: Bellman-Ford $O(VE)$ / SPFA 指定可
+
+**主な機能:**
+- 制約登録: `add_diff_leq/geq/lt/gt/eq`, `add_bound_leq/geq/eq`, `add_range`
+- 実行可能判定・矛盾原因: `is_feasible(use_spfa = false)`, `get_contradiction_cycle()`
+- 解配列の構成:
+  - `solve(use_spfa = false)`: 制約を満たす任意の解 `x[0..n-1]` を構成
+  - `solve_min(base = -1, use_spfa = false)`: 基準 $x_{base} = 0$（`-1` なら絶対境界基準 `x_zero = 0`）で各 $x_i$ を同時最小化する構成解 `x[0..n-1]` を返す（反転グラフ上の最短路 $-d_{rev}[i]$）
+  - `solve_max(base = -1, use_spfa = false)`: 基準 $x_{base} = 0$（`-1` なら絶対境界基準 `x_zero = 0`）で各 $x_i$ を同時最大化する構成解 `x[0..n-1]` を返す（元グラフ上の最短路 $d[i]$）
+- 2変数差の上下界＋構成解取得: `max_diff(u, v)`, `min_diff(u, v)` (`FINITE` / `INFEASIBLE` / `UNBOUNDED` と値に加え、構成解・距離配列も更新)
+- 構成・生距離・根拠パスの参照: `solution()`, `dist(v)`, `dists()`, `is_reachable(v)`, `get_dist_optional(v)`, `get_path(target)`, `last_algorithm()`
+
+**使用例:**
+```cpp
+#include "mylib/DifferenceConstraints.hpp"
+
+DifferenceConstraints<long long> dc(n);
+dc.add_diff_leq(1, 0, 5);  // x_1 - x_0 <= 5
+dc.add_diff_geq(2, 1, 3);  // x_2 - x_1 >= 3
+dc.add_bound_geq(0, 0);    // x_0 >= 0 (絶対値基準 base = -1 用)
+
+// 1. 基準 (x_zero = 0) のもとで各変数を最小化する構成解を取得
+if (auto x_min = dc.solve_min()) {
+    // (*x_min)[i] が各変数の最小構成値
+    // dc.dist(i) で反転グラフ上の生の最短距離 (d_rev[i] = -(*x_min)[i]) も参照可能
+}
+
+// 2. min(x_u - x_v) の値と、それを達成する構成解・最短路距離・決定パスを取得
+auto res = dc.min_diff(2, 0);
+if (res.status == DifferenceConstraints<long long>::FINITE) {
+    long long min_val = res.value;
+    auto x = dc.solution();   // x[2] - x[0] == min_val かつ全制約を満たす構成解
+    auto d = dc.dists();      // 最短路計算 (Dijkstra / Bellman-Ford) が算出した生距離配列
+    auto p = dc.get_path(0);  // 上界/下界を決定したパス (2 -> ... -> 0)
+}
+```
+
+<details>
+<summary><b>ソースコードを展開 (DifferenceConstraints.hpp)</b></summary>
+
+```cpp
+#pragma once
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <limits>
+#include <optional>
+#include <queue>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+using namespace std;
+
 // ============================================================================
+// 差分制約系ソルバー / 牛ゲー専用ライブラリ (DifferenceConstraints)
+// ============================================================================
+// n 個の変数 x_0, ..., x_{n-1} に関する線形不等式制約を最短経路問題に帰着して解きます:
+//   - x_u - x_v <= w   <=>  辺 v -> u (重み w)
+//   - x_u - x_v >= w   <=>  辺 u -> v (重み -w)
+//   - x_u <= w, x_u >= w などの絶対値境界 (内部参照頂点 n を基準 x_zero = 0 として管理)
+//
+// 【特徴・構成方法と距離の取得】
+// - 非負辺のみ (w >= 0) の場合は自動的に Dijkstra O((V+E) log V) で高速実行し、
+//   負辺を含む場合は Bellman-Ford O(VE) または SPFA を使用します。
+// - 最小・最大の「値」だけでなく、それを構成する解配列 solution() および
+//   最短経路アルゴリズムが計算した生の距離配列 dist(v) / dists()、パス復元 get_path(v) を取得可能です。
+//   1. solve()                 : 制約を満たす任意の解 x[0..n-1] を 1 つ構成
+//   2. solve_max(base = -1)    : x_base = 0 基準で各 x_i を同時最大化 (元グラフ最短距離 d[i])
+//   3. solve_min(base = -1)    : x_base = 0 基準で各 x_i を同時最小化 (反転グラフ最短距離 -d_rev[i])
+//   4. max_diff(u, v) / min_diff(u, v) : 2変数差の上限・下限と達成解 solution() / dists() を計算
+//
+// 使用例:
+//   DifferenceConstraints<long long> dc(n);
+//   dc.add_diff_leq(1, 0, 5);  // x_1 - x_0 <= 5
+//   dc.add_diff_geq(2, 1, 3);  // x_2 - x_1 >= 3
+//   dc.add_bound_geq(0, 0);    // x_0 >= 0 (base = -1 の基準変数 x_zero = 0 に対する制約)
+//   if (auto x = dc.solve_min()) {
+//     // (*x)[i]: 最小を達成する構成解
+//     // dc.dist(i): 反転グラフ上の生の最短距離 (= -(*x)[i])
+//   }
+// ============================================================================
+
+namespace dc_internal {
+
+template <typename T> struct Limits {
+  static constexpr T max_val() {
+    if constexpr (is_same_v<T, __int128_t>) {
+      return (T)((((unsigned __int128)1) << 126) - 1 +
+                 (((unsigned __int128)1) << 126));
+    } else {
+      return numeric_limits<T>::max();
+    }
+  }
+  static constexpr T min_val() {
+    if constexpr (is_same_v<T, __int128_t>) {
+      return -max_val() - 1;
+    } else {
+      return numeric_limits<T>::lowest();
+    }
+  }
+};
+
+} // namespace dc_internal
+
 template <typename T = long long> struct DifferenceConstraints {
+  static constexpr T INF = dc_internal::Limits<T>::max_val() / 2;
+  static constexpr T NEG_INF = dc_internal::Limits<T>::min_val() / 2;
+
+  enum Status : uint8_t { FINITE = 0, INFEASIBLE = 1, UNBOUNDED = 2 };
+  enum Algorithm : uint8_t {
+    NONE = 0,
+    DIJKSTRA = 1,
+    BELLMAN_FORD = 2,
+    SPFA = 3
+  };
+
   struct BoundResult {
-    enum Status { FINITE, INFEASIBLE, UNBOUNDED } status;
+    Status status;
     T value = 0;
   };
 
+  struct Edge {
+    int from;
+    int to;
+    T cost;
+  };
+
 private:
-  int n_;
-  BellmanFord<T> bf_; // 頂点 0..n-1 が変数、頂点 n が基準変数 x_zero (= 0)
+  int n_; // 頂点 0..n-1 が変数、頂点 n が基準変数 x_zero (= 0)
+  T eps_;
+  bool has_negative_edge_ = false;
+  vector<Edge> edges_;
+  vector<vector<pair<int, int>>> adj_;     // adj_[u] = {{v, edge_id}, ...}
+  vector<vector<pair<int, int>>> rev_adj_; // rev_adj_[v] = {{u, edge_id}, ...}
+
+  // 直近の探索・構成結果 (サイズ n_ + 1、末尾 n_ が x_zero)
+  vector<T> dist_;
+  vector<uint8_t> reached_;
+  vector<int> parent_;
+  vector<T> solution_;
+  Status last_status_ = FINITE;
+  Algorithm last_algo_ = NONE;
+  int last_source_ = -1;
+  bool last_reversed_ = false;
+  int last_cycle_node_ = -1;
+
+  void add_edge_internal(int from, int to, T cost) {
+    assert(0 <= from && from <= n_ && 0 <= to && to <= n_);
+    if (cost < (T)0)
+      has_negative_edge_ = true;
+    int id = (int)edges_.size();
+    edges_.push_back({from, to, cost});
+    adj_[from].push_back({to, id});
+    rev_adj_[to].push_back({from, id});
+  }
+
+  pair<T, bool> add_clamped(T d, T cost) const {
+    if constexpr (is_integral_v<T> && sizeof(T) <= 8) {
+      __int128 res = (__int128)d + (__int128)cost;
+      if (res <= (__int128)NEG_INF)
+        return {NEG_INF, true};
+      if (res >= (__int128)INF)
+        return {INF, true};
+      return {(T)res, false};
+    } else if constexpr (is_same_v<T, __int128_t>) {
+      if (cost < 0 && d < NEG_INF - cost)
+        return {NEG_INF, true};
+      if (cost > 0 && d > INF - cost)
+        return {INF, true};
+      T res = d + cost;
+      if (res <= NEG_INF)
+        return {NEG_INF, true};
+      if (res >= INF)
+        return {INF, true};
+      return {res, false};
+    } else {
+      T res = d + cost;
+      if (res <= NEG_INF)
+        return {NEG_INF, true};
+      if (res >= INF)
+        return {INF, true};
+      return {res, false};
+    }
+  }
+
+  bool is_better(T cand, T cur) const { return cand < cur - eps_; }
+
+  // 全頂点 0..n_ から一斉開始する実行可能性判定 (ポテンシャル p も生成)
+  bool run_all_sources_core(bool use_spfa, vector<T> &out_dist,
+                            vector<uint8_t> &out_reached,
+                            vector<int> &out_parent,
+                            int &out_cycle_node, Algorithm &out_algo) const {
+    int total = n_ + 1;
+    out_dist.assign(total, (T)0);
+    out_reached.assign(total, 1);
+    out_parent.assign(total, -1);
+    out_cycle_node = -1;
+
+    if (!has_negative_edge_) {
+      out_algo = DIJKSTRA;
+      return true;
+    }
+
+    if (use_spfa) {
+      out_algo = SPFA;
+      queue<int> q;
+      vector<uint8_t> in_q(total, 1);
+      vector<int> path_len(total, 0);
+      for (int i = 0; i < total; ++i)
+        q.push(i);
+      int rounds = 0;
+      int rem = total;
+
+      auto has_parent_cycle = [&](int v) -> pair<bool, int> {
+        int cur = v;
+        for (int step = 1; step <= total; ++step) {
+          cur = out_parent[cur];
+          if (cur == -1)
+            return {false, step - 1};
+        }
+        return {true, total};
+      };
+
+      while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+        in_q[u] = 0;
+
+        for (auto [v, eid] : adj_[u]) {
+          auto [cand, clamped] = add_clamped(out_dist[u], edges_[eid].cost);
+          if (clamped && cand <= NEG_INF) {
+            out_dist[v] = NEG_INF;
+            out_parent[v] = u;
+            out_cycle_node = v;
+            return false;
+          }
+          if (is_better(cand, out_dist[v])) {
+            out_dist[v] = cand;
+            out_parent[v] = u;
+            path_len[v] = path_len[u] + 1;
+            if (path_len[v] >= total) {
+              auto [has_cyc, actual_len] = has_parent_cycle(v);
+              if (has_cyc) {
+                out_cycle_node = v;
+                return false;
+              }
+              path_len[v] = actual_len;
+            }
+            if (!in_q[v]) {
+              q.push(v);
+              in_q[v] = 1;
+            }
+          }
+        }
+        if (--rem == 0) {
+          rounds++;
+          if (!q.empty()) {
+            if (rounds >= total) {
+              // フォールバックとして決定論的ベルマンフォードを実行
+              break;
+            }
+            rem = (int)q.size();
+          }
+        }
+      }
+      if (q.empty())
+        return true;
+      // rounds >= total で抜けた場合は決定論的ベルマンフォードへフォールバック
+      out_dist.assign(total, (T)0);
+      out_parent.assign(total, -1);
+    }
+
+    out_algo = BELLMAN_FORD;
+    for (int it = 0; it < total; ++it) {
+      bool updated = false;
+      for (const auto &e : edges_) {
+        auto [cand, clamped] = add_clamped(out_dist[e.from], e.cost);
+        if (clamped && cand <= NEG_INF) {
+          out_dist[e.to] = NEG_INF;
+          out_parent[e.to] = e.from;
+          out_cycle_node = e.to;
+          return false;
+        }
+        if (is_better(cand, out_dist[e.to])) {
+          out_dist[e.to] = cand;
+          out_parent[e.to] = e.from;
+          updated = true;
+          if (it == total - 1) {
+            out_cycle_node = e.to;
+            return false;
+          }
+        }
+      }
+      if (!updated)
+        break;
+    }
+    return true;
+  }
+
+  // 単一始点 start から最短経路を実行 (元グラフまたは反転グラフ)
+  // ※ 事前に負閉路がない (feasible) グラフ上で呼ぶこと
+  void run_sssp(int start, bool reversed, bool use_spfa, vector<T> &out_dist,
+                vector<uint8_t> &out_reached, vector<int> &out_parent,
+                Algorithm &out_algo) const {
+    int total = n_ + 1;
+    out_dist.assign(total, INF);
+    out_reached.assign(total, 0);
+    out_parent.assign(total, -1);
+
+    const auto &g = reversed ? rev_adj_ : adj_;
+    out_dist[start] = 0;
+    out_reached[start] = 1;
+
+    if (!has_negative_edge_) {
+      out_algo = DIJKSTRA;
+      using P = pair<T, int>;
+      priority_queue<P, vector<P>, greater<P>> pq;
+      pq.push({(T)0, start});
+      while (!pq.empty()) {
+        auto [c, u] = pq.top();
+        pq.pop();
+        if (c > out_dist[u])
+          continue;
+        for (auto [v, eid] : g[u]) {
+          auto [nc, _] = add_clamped(c, edges_[eid].cost);
+          if (!out_reached[v] || is_better(nc, out_dist[v])) {
+            out_reached[v] = 1;
+            out_dist[v] = nc;
+            out_parent[v] = u;
+            pq.push({nc, v});
+          }
+        }
+      }
+      return;
+    }
+
+    if (use_spfa) {
+      out_algo = SPFA;
+      queue<int> q;
+      vector<uint8_t> in_q(total, 0);
+      q.push(start);
+      in_q[start] = 1;
+      int rounds = 0;
+      int rem = 1;
+
+      while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+        in_q[u] = 0;
+        for (auto [v, eid] : g[u]) {
+          auto [nc, _] = add_clamped(out_dist[u], edges_[eid].cost);
+          if (!out_reached[v] || is_better(nc, out_dist[v])) {
+            out_reached[v] = 1;
+            out_dist[v] = nc;
+            out_parent[v] = u;
+            if (!in_q[v]) {
+              q.push(v);
+              in_q[v] = 1;
+            }
+          }
+        }
+        if (--rem == 0) {
+          rounds++;
+          if (!q.empty()) {
+            if (rounds >= total)
+              break;
+            rem = (int)q.size();
+          }
+        }
+      }
+      if (q.empty())
+        return;
+      out_dist.assign(total, INF);
+      out_reached.assign(total, 0);
+      out_parent.assign(total, -1);
+      out_dist[start] = 0;
+      out_reached[start] = 1;
+    }
+
+    out_algo = BELLMAN_FORD;
+    for (int it = 0; it < total; ++it) {
+      bool updated = false;
+      for (const auto &e : edges_) {
+        int u = reversed ? e.to : e.from;
+        int v = reversed ? e.from : e.to;
+        if (!out_reached[u])
+          continue;
+        auto [nc, _] = add_clamped(out_dist[u], e.cost);
+        if (!out_reached[v] || is_better(nc, out_dist[v])) {
+          out_reached[v] = 1;
+          out_dist[v] = nc;
+          out_parent[v] = u;
+          updated = true;
+        }
+      }
+      if (!updated)
+        break;
+    }
+  }
+
+  // 到達可能部の最短路 d と全体ポテンシャル p を合成し、全変数が制約を満たす完全解を作る
+  void build_completed_solution(const vector<T> &d,
+                                const vector<uint8_t> &reached,
+                                const vector<T> &p) {
+    using W_T = conditional_t<is_integral_v<T> && sizeof(T) <= 8, __int128_t, T>;
+    bool has_c = false;
+    W_T shift_c = 0;
+    for (int i = 0; i <= n_; ++i) {
+      if (reached[i]) {
+        W_T cand = (W_T)d[i] - (W_T)p[i];
+        if (!has_c || cand > shift_c) {
+          has_c = true;
+          shift_c = cand;
+        }
+      }
+    }
+    vector<W_T> x_full(n_ + 1);
+    for (int i = 0; i <= n_; ++i) {
+      x_full[i] = reached[i] ? (W_T)d[i] : ((W_T)p[i] + shift_c);
+    }
+    W_T zero_off = x_full[n_];
+    solution_.resize(n_);
+    for (int i = 0; i < n_; ++i) {
+      solution_[i] = (T)(x_full[i] - zero_off);
+    }
+  }
 
 public:
-  explicit DifferenceConstraints(int n = 0, T eps = 0) : n_(n), bf_(n + 1, eps) {
+  explicit DifferenceConstraints(int n = 0, T eps = 0)
+      : n_(n), eps_(eps), adj_(n + 1), rev_adj_(n + 1) {
     assert(n >= 0);
   }
 
   int num_variables() const { return n_; }
+  int num_constraints() const { return (int)edges_.size(); }
+  bool has_negative_edge() const { return has_negative_edge_; }
+  const vector<Edge> &edges() const { return edges_; }
 
+  void clear(int new_n = -1) {
+    if (new_n >= 0) {
+      assert(new_n >= 0);
+      n_ = new_n;
+    }
+    edges_.clear();
+    adj_.assign(n_ + 1, {});
+    rev_adj_.assign(n_ + 1, {});
+    has_negative_edge_ = false;
+    dist_.clear();
+    reached_.clear();
+    parent_.clear();
+    solution_.clear();
+    last_status_ = FINITE;
+    last_algo_ = NONE;
+    last_source_ = -1;
+    last_reversed_ = false;
+    last_cycle_node_ = -1;
+  }
+
+  // --- 制約の追加 ---
   // x_u - x_v <= w
   void add_diff_leq(int u, int v, T w) {
     assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    bf_.add_edge(v, u, w);
+    add_edge_internal(v, u, w);
   }
 
   // x_u - x_v >= w  <=>  x_v - x_u <= -w
   void add_diff_geq(int u, int v, T w) {
     assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    bf_.add_edge(u, v, -w);
+    add_edge_internal(u, v, -w);
   }
 
   // x_u - x_v < w (整数型では x_u - x_v <= w - 1)
@@ -7188,16 +7631,16 @@ public:
     add_diff_geq(u, v, w);
   }
 
-  // x_u <= w  <=>  x_u - x_n <= w
+  // x_u <= w  <=>  x_u - x_zero <= w
   void add_bound_leq(int u, T w) {
     assert(0 <= u && u < n_);
-    bf_.add_edge(n_, u, w);
+    add_edge_internal(n_, u, w);
   }
 
-  // x_u >= w  <=>  x_n - x_u <= -w
+  // x_u >= w  <=>  x_zero - x_u <= -w
   void add_bound_geq(int u, T w) {
     assert(0 <= u && u < n_);
-    bf_.add_edge(u, n_, -w);
+    add_edge_internal(u, n_, -w);
   }
 
   // x_u == w
@@ -7212,67 +7655,257 @@ public:
     add_bound_leq(u, high);
   }
 
-  // 制約系に矛盾がないか判定
+  // --- 実行可能性・任意解・最小化/最大化解構成 ---
+  // 制約系に矛盾がないか判定 (非負辺のみなら O(1) で true)
   bool is_feasible(bool use_spfa = false) {
-    return use_spfa ? bf_.run_spfa_all_sources(false) : bf_.run_all_sources();
-  }
-
-  // すべての制約を満たす解 x[0..n-1] を 1 つ構成して返す (矛盾時は nullopt)
-  optional<vector<T>> solve(bool use_spfa = false) {
-    if (!is_feasible(use_spfa)) return nullopt;
-    T zero_val = bf_.dist(n_);
-    vector<T> x(n_);
-    for (int i = 0; i < n_; ++i) {
-      x[i] = bf_.dist(i) - zero_val;
+    int cyc_node = -1;
+    bool ok = run_all_sources_core(use_spfa, dist_, reached_, parent_, cyc_node,
+                                   last_algo_);
+    last_source_ = -1;
+    last_reversed_ = false;
+    last_cycle_node_ = cyc_node;
+    if (!ok) {
+      last_status_ = INFEASIBLE;
+      solution_.clear();
+      return false;
     }
-    return x;
+    last_status_ = FINITE;
+    T zero_val = dist_[n_];
+    solution_.resize(n_);
+    for (int i = 0; i < n_; ++i) {
+      solution_[i] = dist_[i] - zero_val;
+    }
+    return true;
   }
 
-  // 矛盾の原因となっている負閉路を返す (先に is_feasible() や solve() を呼ぶか自動実行)
+  // すべての制約を満たす実行可能解 x[0..n-1] を 1 つ構成して返す (矛盾時は nullopt)
+  optional<vector<T>> solve(bool use_spfa = false) {
+    if (!is_feasible(use_spfa))
+      return nullopt;
+    return solution_;
+  }
+
+  // 基準頂点 base (x_base = 0; base == -1 のときは絶対値基準 x_zero = 0) のもとで
+  // すべての変数 x[0..n-1] を同時最大化する解を構成して返す。
+  // 矛盾または上界なし (未到達) の変数が存在する場合は nullopt を返すが、
+  // 到達可能頂点の最短距離はそのまま dist(i) / dists() / is_reachable(i) で参照可能。
+  optional<vector<T>> solve_max(int base = -1, bool use_spfa = false) {
+    assert(-1 <= base && base < n_);
+    int s = (base == -1) ? n_ : base;
+
+    vector<T> p;
+    vector<uint8_t> p_reach;
+    vector<int> p_par;
+    int cyc_node = -1;
+    Algorithm feas_algo = NONE;
+    if (!run_all_sources_core(use_spfa, p, p_reach, p_par, cyc_node,
+                              feas_algo)) {
+      dist_ = std::move(p);
+      reached_ = std::move(p_reach);
+      parent_ = std::move(p_par);
+      last_algo_ = feas_algo;
+      last_cycle_node_ = cyc_node;
+      last_source_ = -1;
+      last_reversed_ = false;
+      last_status_ = INFEASIBLE;
+      solution_.clear();
+      return nullopt;
+    }
+
+    run_sssp(s, false, use_spfa, dist_, reached_, parent_, last_algo_);
+    last_source_ = s;
+    last_reversed_ = false;
+    last_cycle_node_ = -1;
+
+    for (int i = 0; i < n_; ++i) {
+      if (!reached_[i]) {
+        last_status_ = UNBOUNDED;
+        solution_.clear();
+        return nullopt;
+      }
+    }
+
+    last_status_ = FINITE;
+    solution_.resize(n_);
+    for (int i = 0; i < n_; ++i) {
+      solution_[i] = dist_[i];
+    }
+    return solution_;
+  }
+
+  // 基準頂点 base (x_base = 0; base == -1 のときは絶対値基準 x_zero = 0) のもとで
+  // すべての変数 x[0..n-1] を同時最小化 (反転グラフで最短路を解き x[i] = -dist[i]) する解を返す。
+  // 矛盾または下界なし (反転グラフで未到達) の変数が存在する場合は nullopt を返すが、
+  // 到達可能頂点の反転グラフ上最短距離は dist(i) / dists() / is_reachable(i) で参照可能。
+  optional<vector<T>> solve_min(int base = -1, bool use_spfa = false) {
+    assert(-1 <= base && base < n_);
+    int s = (base == -1) ? n_ : base;
+
+    vector<T> p;
+    vector<uint8_t> p_reach;
+    vector<int> p_par;
+    int cyc_node = -1;
+    Algorithm feas_algo = NONE;
+    if (!run_all_sources_core(use_spfa, p, p_reach, p_par, cyc_node,
+                              feas_algo)) {
+      dist_ = std::move(p);
+      reached_ = std::move(p_reach);
+      parent_ = std::move(p_par);
+      last_algo_ = feas_algo;
+      last_cycle_node_ = cyc_node;
+      last_source_ = -1;
+      last_reversed_ = false;
+      last_status_ = INFEASIBLE;
+      solution_.clear();
+      return nullopt;
+    }
+
+    run_sssp(s, true, use_spfa, dist_, reached_, parent_, last_algo_);
+    last_source_ = s;
+    last_reversed_ = true;
+    last_cycle_node_ = -1;
+
+    for (int i = 0; i < n_; ++i) {
+      if (!reached_[i]) {
+        last_status_ = UNBOUNDED;
+        solution_.clear();
+        return nullopt;
+      }
+    }
+
+    last_status_ = FINITE;
+    solution_.resize(n_);
+    for (int i = 0; i < n_; ++i) {
+      solution_[i] = -dist_[i];
+    }
+    return solution_;
+  }
+
+  // 矛盾の原因となっている負閉路を返す (なければ空配列、頂点 n は基準変数 x_zero)
   vector<int> get_contradiction_cycle() {
-    if (bf_.run_all_sources()) return {};
-    return bf_.get_cycle();
+    if (is_feasible())
+      return {};
+    int total = n_ + 1;
+    int x = last_cycle_node_;
+    if (x == -1)
+      return {};
+    for (int i = 0; i < total; ++i) {
+      x = parent_[x];
+      if (x == -1)
+        return {};
+    }
+    vector<int> cyc;
+    int cur = x;
+    do {
+      cyc.push_back(cur);
+      cur = parent_[cur];
+      if (cur == -1)
+        return {};
+    } while (cur != x && (int)cyc.size() <= total);
+    if (cur != x)
+      return {};
+    cyc.push_back(x);
+    reverse(cyc.begin(), cyc.end());
+    return cyc;
   }
 
   // 制約のもとでの (x_u - x_v) の最大値を求める (POJ 3169 Layout など)
-  // INFEASIBLE: 制約に矛盾あり / UNBOUNDED: 差をいくらでも大きくできる / FINITE: 最大値
+  // 同時に solution() でその最大値を達成する完全解 x[0..n-1]、
+  // dists() で最短経路計算の生距離 (基準 v からの距離) を取得可能になる。
   BoundResult max_diff(int u, int v, bool use_spfa = false) {
     assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    if (!is_feasible(use_spfa)) {
-      return {BoundResult::INFEASIBLE, 0};
+    vector<T> p;
+    vector<uint8_t> p_reach;
+    vector<int> p_par;
+    int cyc_node = -1;
+    Algorithm feas_algo = NONE;
+    if (!run_all_sources_core(use_spfa, p, p_reach, p_par, cyc_node,
+                              feas_algo)) {
+      dist_ = std::move(p);
+      reached_ = std::move(p_reach);
+      parent_ = std::move(p_par);
+      last_algo_ = feas_algo;
+      last_cycle_node_ = cyc_node;
+      last_source_ = -1;
+      last_reversed_ = false;
+      last_status_ = INFEASIBLE;
+      solution_.clear();
+      return {INFEASIBLE, 0};
     }
-    if (use_spfa) {
-      bf_.run_spfa(v, false);
-    } else {
-      bf_.run(v);
+
+    run_sssp(v, false, use_spfa, dist_, reached_, parent_, last_algo_);
+    last_source_ = v;
+    last_reversed_ = false;
+    last_cycle_node_ = -1;
+
+    if (!reached_[u]) {
+      last_status_ = UNBOUNDED;
+      solution_.clear();
+      return {UNBOUNDED, 0};
     }
-    if (!bf_.is_reachable(u)) {
-      return {BoundResult::UNBOUNDED, 0};
-    }
-    return {BoundResult::FINITE, bf_.dist(u)};
+
+    build_completed_solution(dist_, reached_, p);
+    last_status_ = FINITE;
+    return {FINITE, dist_[u]};
   }
 
-  // 制約のもとでの (x_u - x_v) の最小値を求める
-  // min(x_u - x_v) = -max(x_v - x_u)
+  // 制約のもとでの (x_u - x_v) の最小値を求める: min(x_u - x_v) = -max(x_v - x_u)
+  // 同時に solution() でその最小値を達成する完全解 x[0..n-1]、
+  // dists() で最短経路計算の生距離 (基準 u からの距離) を取得可能になる。
   BoundResult min_diff(int u, int v, bool use_spfa = false) {
     BoundResult res = max_diff(v, u, use_spfa);
-    if (res.status == BoundResult::FINITE) {
+    if (res.status == FINITE) {
       res.value = -res.value;
     }
     return res;
   }
-};
 
-// ============================================================================
-// 隣接リストからの簡易呼び出し関数 (Dijkstra.hpp 互換スタイル)
-// ============================================================================
-template <typename T = long long>
-inline BellmanFord<T> bellman_ford(const vector<vector<pair<int, T>>> &g,
-                                   int start = 0) {
-  BellmanFord<T> bf(g);
-  bf.run(start);
-  return bf;
-}
+  // --- 直近に実行した解・距離・構成パスの参照 ---
+  Status last_status() const { return last_status_; }
+  Algorithm last_algorithm() const { return last_algo_; }
+
+  // 直近の solve / solve_min / solve_max / max_diff / min_diff で構成した変数配列 x[0..n-1]
+  const vector<T> &solution() const { return solution_; }
+
+  // 直近の最短経路計算における頂点 v (0 <= v <= n, n は x_zero) までの生距離 (未到達は INF)
+  T dist(int v) const {
+    assert(0 <= v && v <= n_);
+    assert(!dist_.empty());
+    return dist_[v];
+  }
+
+  const vector<T> &dists() const { return dist_; }
+
+  bool is_reachable(int v) const {
+    assert(0 <= v && v <= n_);
+    return !reached_.empty() && reached_[v] != 0;
+  }
+
+  optional<T> get_dist_optional(int v) const {
+    if (!is_reachable(v))
+      return nullopt;
+    return dist_[v];
+  }
+
+  // 直近の最短経路計算において target までの距離 (制約の上界/下界) を決定したパス列を復元
+  vector<int> get_path(int target) const {
+    if (!is_reachable(target))
+      return {};
+    int total = n_ + 1;
+    vector<int> path;
+    int cur = target;
+    int steps = 0;
+    while (cur != -1 && steps <= total) {
+      path.push_back(cur);
+      cur = parent_[cur];
+      steps++;
+    }
+    if (cur != -1)
+      return {};
+    reverse(path.begin(), path.end());
+    return path;
+  }
+};
 ```
 
 </details>
@@ -10460,6 +11093,7 @@ inline auto golden_section_search_max_int(Int1 low, Int2 high, F f) {
 #include "BiCoef.hpp"
 #include "BIT2D.hpp"
 #include "CoordinateCompression.hpp"
+#include "DifferenceConstraints.hpp"
 #include "Dijkstra.hpp"
 #include "DisjointSparseTable.hpp"
 #include "DoubleRollingHash.hpp"

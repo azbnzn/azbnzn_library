@@ -15,14 +15,14 @@
 using namespace std;
 
 // ============================================================================
-// 多機能ベルマンフォード法・SPFA・差分制約系・最小平均閉路ライブラリ (BellmanFord)
+// 多機能ベルマンフォード法・SPFA・最小平均閉路ライブラリ (BellmanFord)
 // ============================================================================
 // 【概要】
 // 負の重みを持つ有向/無向グラフに対する単一始点・多始点最短経路、負閉路検出と復元、
 // 到達可能な負閉路の影響を受ける頂点 (-INF) の厳密判定、最長経路 (+INF 判定対応)、
 // SPFA、辺数制約付き最短経路、最小/最大平均重み閉路 (Karp のアルゴリズム)、
-// Johnson のポテンシャル計算・全点対最短経路 (APSP)、差分制約系 (牛ゲー) を
-// ひとつのヘッダで網羅的に提供します。
+// Johnson のポテンシャル計算・全点対最短経路 (APSP) をひとつのヘッダで提供します。
+// (※ 差分制約系 / 牛ゲー専用ライブラリは DifferenceConstraints.hpp に独立)
 //
 // 【主な機能】
 // 1. BellmanFord<T> (デフォルト T = long long):
@@ -40,11 +40,7 @@ using namespace std;
 //    - グラフ反転・ポテンシャル・全点対最短路:
 //      reversed(), compute_potentials(), all_pairs_shortest_path()
 //
-// 2. DifferenceConstraints<T> (差分制約系 / 牛ゲー):
-//    - x_u - x_v <= w, >= w, < w, > w, == w や絶対範囲 low <= x_u <= high を記述可能
-//    - solve(), is_feasible(), get_contradiction_cycle(), max_diff(u, v), min_diff(u, v)
-//
-// 3. 簡易関数:
+// 2. 簡易関数:
 //    - bellman_ford(g, start): 隣接リストから即座に実行済みの BellmanFord を返す
 // ============================================================================
 
@@ -937,136 +933,6 @@ public:
           res[s][v] = (T)actual;
         }
       }
-    }
-    return res;
-  }
-};
-
-// ============================================================================
-// 差分制約系ソルバー (System of Difference Constraints / 牛ゲー)
-// ============================================================================
-// n 個の変数 x_0, ..., x_{n-1} に関する以下の線形不等式制約を管理・解決します:
-// - x_u - x_v <= w   <=>  辺 v -> u (重み w)
-// - x_u - x_v >= w   <=>  辺 u -> v (重み -w)
-// - x_u <= w, x_u >= w などの絶対値境界 (内部参照頂点 n を基準 x_n = 0 として管理)
-// ============================================================================
-template <typename T = long long> struct DifferenceConstraints {
-  struct BoundResult {
-    enum Status { FINITE, INFEASIBLE, UNBOUNDED } status;
-    T value = 0;
-  };
-
-private:
-  int n_;
-  BellmanFord<T> bf_; // 頂点 0..n-1 が変数、頂点 n が基準変数 x_zero (= 0)
-
-public:
-  explicit DifferenceConstraints(int n = 0, T eps = 0) : n_(n), bf_(n + 1, eps) {
-    assert(n >= 0);
-  }
-
-  int num_variables() const { return n_; }
-
-  // x_u - x_v <= w
-  void add_diff_leq(int u, int v, T w) {
-    assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    bf_.add_edge(v, u, w);
-  }
-
-  // x_u - x_v >= w  <=>  x_v - x_u <= -w
-  void add_diff_geq(int u, int v, T w) {
-    assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    bf_.add_edge(u, v, -w);
-  }
-
-  // x_u - x_v < w (整数型では x_u - x_v <= w - 1)
-  void add_diff_lt(int u, int v, T w) {
-    static_assert(is_integral_v<T>, "add_diff_lt requires integral type");
-    add_diff_leq(u, v, w - 1);
-  }
-
-  // x_u - x_v > w (整数型では x_u - x_v >= w + 1)
-  void add_diff_gt(int u, int v, T w) {
-    static_assert(is_integral_v<T>, "add_diff_gt requires integral type");
-    add_diff_geq(u, v, w + 1);
-  }
-
-  // x_u - x_v == w
-  void add_diff_eq(int u, int v, T w) {
-    add_diff_leq(u, v, w);
-    add_diff_geq(u, v, w);
-  }
-
-  // x_u <= w  <=>  x_u - x_n <= w
-  void add_bound_leq(int u, T w) {
-    assert(0 <= u && u < n_);
-    bf_.add_edge(n_, u, w);
-  }
-
-  // x_u >= w  <=>  x_n - x_u <= -w
-  void add_bound_geq(int u, T w) {
-    assert(0 <= u && u < n_);
-    bf_.add_edge(u, n_, -w);
-  }
-
-  // x_u == w
-  void add_bound_eq(int u, T w) {
-    add_bound_leq(u, w);
-    add_bound_geq(u, w);
-  }
-
-  // low <= x_u <= high
-  void add_range(int u, T low, T high) {
-    add_bound_geq(u, low);
-    add_bound_leq(u, high);
-  }
-
-  // 制約系に矛盾がないか判定
-  bool is_feasible(bool use_spfa = false) {
-    return use_spfa ? bf_.run_spfa_all_sources(false) : bf_.run_all_sources();
-  }
-
-  // すべての制約を満たす解 x[0..n-1] を 1 つ構成して返す (矛盾時は nullopt)
-  optional<vector<T>> solve(bool use_spfa = false) {
-    if (!is_feasible(use_spfa)) return nullopt;
-    T zero_val = bf_.dist(n_);
-    vector<T> x(n_);
-    for (int i = 0; i < n_; ++i) {
-      x[i] = bf_.dist(i) - zero_val;
-    }
-    return x;
-  }
-
-  // 矛盾の原因となっている負閉路を返す (先に is_feasible() や solve() を呼ぶか自動実行)
-  vector<int> get_contradiction_cycle() {
-    if (bf_.run_all_sources()) return {};
-    return bf_.get_cycle();
-  }
-
-  // 制約のもとでの (x_u - x_v) の最大値を求める (POJ 3169 Layout など)
-  // INFEASIBLE: 制約に矛盾あり / UNBOUNDED: 差をいくらでも大きくできる / FINITE: 最大値
-  BoundResult max_diff(int u, int v, bool use_spfa = false) {
-    assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    if (!is_feasible(use_spfa)) {
-      return {BoundResult::INFEASIBLE, 0};
-    }
-    if (use_spfa) {
-      bf_.run_spfa(v, false);
-    } else {
-      bf_.run(v);
-    }
-    if (!bf_.is_reachable(u)) {
-      return {BoundResult::UNBOUNDED, 0};
-    }
-    return {BoundResult::FINITE, bf_.dist(u)};
-  }
-
-  // 制約のもとでの (x_u - x_v) の最小値を求める
-  // min(x_u - x_v) = -max(x_v - x_u)
-  BoundResult min_diff(int u, int v, bool use_spfa = false) {
-    BoundResult res = max_diff(v, u, use_spfa);
-    if (res.status == BoundResult::FINITE) {
-      res.value = -res.value;
     }
     return res;
   }

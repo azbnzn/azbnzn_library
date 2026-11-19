@@ -4,6 +4,7 @@
 #include "BiCoef.hpp"
 #include "BIT2D.hpp"
 #include "CoordinateCompression.hpp"
+#include "DifferenceConstraints.hpp"
 #include "Dijkstra.hpp"
 #include "DisjointSparseTable.hpp"
 #include "DoubleRollingHash.hpp"
