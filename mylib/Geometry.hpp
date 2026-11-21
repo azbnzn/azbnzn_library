@@ -14,7 +14,7 @@ using namespace std;
 // ====================================================================
 
 // --- 1. 基本設定と型定義 ---
-using Real = double;
+using Real = double; // ※ 座標が 10^9 規模で高精度な外積・内積が必要な場合は long double へ変更推奨
 const Real EPS = 1e-9;
 const Real PI = acos(-1.0);
 
@@ -81,9 +81,9 @@ struct Point {
 
   // 辞書式順序 (X優先、同じならY)
   bool operator<(const Point &p) const {
-    if (sgn(x - p.x) != 0)
-      return sgn(x - p.x) < 0;
-    return sgn(y - p.y) < 0;
+    if (x != p.x)
+      return x < p.x;
+    return y < p.y;
   }
   bool operator>(const Point &p) const { return p < *this; }
 
@@ -104,8 +104,8 @@ struct Point {
 
 inline Point operator*(Real k, const Point &p) { return p * k; }
 
-istream &operator>>(istream &is, Point &p) { return is >> p.x >> p.y; }
-ostream &operator<<(ostream &os, const Point &p) {
+inline istream &operator>>(istream &is, Point &p) { return is >> p.x >> p.y; }
+inline ostream &operator<<(ostream &os, const Point &p) {
   return os << "(" << p.x << ", " << p.y << ")";
 }
 
@@ -180,6 +180,7 @@ inline int ccw(const Point &a, const Point &b, const Point &c) {
 inline Point project(const Point &a, const Point &b, const Point &c) {
   Point ab = b - a;
   Point ac = c - a;
+  assert(sgn(norm(ab)) != 0);
   Real t = dot(ac, ab) / norm(ab);
   return a + ab * t;
 }
@@ -224,6 +225,7 @@ inline bool intersect_line_line(const Point &a, const Point &b, const Point &c,
 // 直線 a-b と点 c の最短距離
 inline Real distance_line_point(const Point &a, const Point &b,
                                 const Point &c) {
+  assert(sgn(distance(a, b)) != 0);
   return abs(cross(b - a, c - a)) / distance(a, b);
 }
 
@@ -276,6 +278,15 @@ inline Point cross_point_line(const Line &l1, const Line &l2) {
 inline Point cross_point_segment(const Point &a, const Point &b, const Point &c,
                                  const Point &d) {
   assert(intersect(a, b, c, d));
+  if (sgn(cross(b - a, d - c)) == 0) {
+    if (ccw(a, b, c) == CCW_ON_SEGMENT)
+      return c;
+    if (ccw(a, b, d) == CCW_ON_SEGMENT)
+      return d;
+    if (ccw(c, d, a) == CCW_ON_SEGMENT)
+      return a;
+    return b;
+  }
   return cross_point_line(a, b, c, d);
 }
 inline Point cross_point_segment(const Segment &s1, const Segment &s2) {
@@ -291,15 +302,24 @@ struct Circle {
 
 // 2つの円の交点座標 (交点なし: 0個, 接する: 1個, 交わる: 2個)
 inline vector<Point> cross_point_circles(const Circle &c1, const Circle &c2) {
+  if (c1.r < -EPS || c2.r < -EPS)
+    return {};
   Real d = distance(c1.c, c2.c);
   // 同心円の場合
   if (sgn(d) == 0) {
+    if (sgn(c1.r) == 0 && sgn(c2.r) == 0) {
+      return {c1.c};
+    }
     return {};
   }
   // 離れすぎ、または一方が他方に完全内包されている
   if (sgn(d - (c1.r + c2.r)) > 0 || sgn(d - abs(c1.r - c2.r)) < 0) {
     return {};
   }
+  if (sgn(c1.r) == 0)
+    return {c1.c};
+  if (sgn(c2.r) == 0)
+    return {c2.c};
 
   // 余弦定理で角度 a を求める (浮動小数点誤差による NaN を clamp で防止)
   Real cos_a = (c1.r * c1.r + d * d - c2.r * c2.r) / (2.0 * c1.r * d);
@@ -317,6 +337,7 @@ inline vector<Point> cross_point_circles(const Circle &c1, const Circle &c2) {
 // 円と直線 a-b の交点座標 (0, 1, または 2 個)
 inline vector<Point> cross_point_circle_line(const Circle &c, const Point &a,
                                              const Point &b) {
+  assert(sgn(distance(a, b)) != 0);
   Real d = distance_line_point(a, b, c.c);
   if (sgn(d - c.r) > 0)
     return {};
@@ -382,28 +403,53 @@ inline bool is_convex(const Polygon &P) {
 // strict = true: 一直線上の余分な点を除去 (厳密な頂点のみ)
 // strict = false: 辺上の点も含める
 inline Polygon convex_hull(vector<Point> P, bool strict = true) {
+  if (P.empty())
+    return {};
+  sort(P.begin(), P.end());
+  Polygon uniq;
+  uniq.reserve(P.size());
+  for (const auto &pt : P) {
+    if (uniq.empty() || !(uniq.back() == pt)) {
+      uniq.push_back(pt);
+    }
+  }
+  P.swap(uniq);
+
   int n = P.size();
   if (n <= 2)
     return P;
-  sort(P.begin(), P.end());
+
+  bool all_collinear = true;
+  for (int i = 2; i < n; i++) {
+    if (sgn(cross(P[1] - P[0], P[i] - P[0])) != 0) {
+      all_collinear = false;
+      break;
+    }
+  }
+  if (all_collinear) {
+    if (strict)
+      return {P.front(), P.back()};
+    return P;
+  }
 
   Polygon ch(2 * n);
   int k = 0;
 
-  Real threshold = strict ? 0.0 : -EPS;
+  auto should_pop = [&](const Point &a, const Point &b, const Point &c) {
+    int s = sgn(cross(b - a, c - b));
+    return strict ? (s <= 0) : (s < 0);
+  };
 
   // 下側凸包
   for (int i = 0; i < n; i++) {
-    while (k >= 2 && sgn(cross(ch[k - 1] - ch[k - 2], P[i] - ch[k - 1])) <=
-                         threshold) {
+    while (k >= 2 && should_pop(ch[k - 2], ch[k - 1], P[i])) {
       k--;
     }
     ch[k++] = P[i];
   }
   // 上側凸包
   for (int i = n - 2, t = k + 1; i >= 0; i--) {
-    while (k >= t && sgn(cross(ch[k - 1] - ch[k - 2], P[i] - ch[k - 1])) <=
-                         threshold) {
+    while (k >= t && should_pop(ch[k - 2], ch[k - 1], P[i])) {
       k--;
     }
     ch[k++] = P[i];
@@ -423,14 +469,15 @@ inline Real convex_diameter(const Polygon &P) {
 
   int is = 0, js = 0;
   for (int i = 1; i < n; i++) {
-    if (P[i].y > P[is].y)
+    if (P[is] < P[i])
       is = i;
-    if (P[i].y < P[js].y)
+    if (P[i] < P[js])
       js = i;
   }
 
   Real max_d = distance(P[is], P[js]);
   int i = is, j = js;
+  int steps = 0;
   do {
     int ni = (i + 1) % n;
     int nj = (j + 1) % n;
@@ -440,7 +487,7 @@ inline Real convex_diameter(const Polygon &P) {
       i = ni;
     }
     max_d = max(max_d, distance(P[i], P[j]));
-  } while (i != is || j != js);
+  } while ((i != is || j != js) && ++steps <= 2 * n);
 
   return max_d;
 }

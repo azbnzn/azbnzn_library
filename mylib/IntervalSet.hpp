@@ -1,11 +1,13 @@
 #pragma once
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <functional>
 #include <iostream>
 #include <limits>
 #include <optional>
 #include <set>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -53,11 +55,24 @@ public:
   using Interval = std::pair<T, T>;
 
 private:
+  using LenT =
+      std::conditional_t<std::is_integral_v<T> && sizeof(T) <= 8, __int128_t, T>;
+
   std::set<Interval> st;
-  T total_len = 0;
+  LenT total_len = 0;
   bool merge_adj = true;
 
-  static constexpr T INF = std::numeric_limits<T>::max();
+  static constexpr T MIN_VAL = std::numeric_limits<T>::lowest();
+  static constexpr T MAX_VAL = std::numeric_limits<T>::max();
+  static constexpr T INF = MAX_VAL;
+
+  static LenT interval_len(T l, T r) {
+    return (LenT)r - (LenT)l + 1;
+  }
+
+  bool touches_or_overlaps(T prev_r, T next_l) const {
+    return prev_r >= next_l || (merge_adj && prev_r < MAX_VAL && prev_r + 1 >= next_l);
+  }
 
 public:
   // コンストラクタ
@@ -67,7 +82,7 @@ public:
   // 状態取得
   bool empty() const { return st.empty(); }
   size_t size() const { return st.size(); }
-  T covered_length() const { return total_len; }
+  T covered_length() const { return (T)total_len; }
   void clear() {
     st.clear();
     total_len = 0;
@@ -95,25 +110,25 @@ public:
     auto it = st.upper_bound({l, INF});
     if (it != st.begin()) {
       auto pit = std::prev(it);
-      if (pit->second + (merge_adj ? 1 : 0) >= l) {
+      if (touches_or_overlaps(pit->second, l)) {
         it = pit;
       }
     }
 
     T nl = l, nr = r;
-    T removed_len = 0;
+    LenT removed_len = 0;
 
-    while (it != st.end() && it->first <= r + (merge_adj ? 1 : 0)) {
+    while (it != st.end() && touches_or_overlaps(r, it->first)) {
       nl = std::min(nl, it->first);
       nr = std::max(nr, it->second);
-      removed_len += (it->second - it->first + 1);
+      removed_len += interval_len(it->first, it->second);
       it = st.erase(it);
     }
 
     st.insert({nl, nr});
-    T added_len = (nr - nl + 1) - removed_len;
+    LenT added_len = interval_len(nl, nr) - removed_len;
     total_len += added_len;
-    return {{nl, nr}, added_len};
+    return {{nl, nr}, (T)added_len};
   }
 
   // 単一の点 x を追加
@@ -137,13 +152,13 @@ public:
       }
     }
 
-    T prev_total = total_len;
+    LenT prev_total = total_len;
     std::vector<Interval> to_readd;
 
     while (it != st.end() && it->first <= r) {
       T il = it->first;
       T ir = it->second;
-      total_len -= (ir - il + 1);
+      total_len -= interval_len(il, ir);
       it = st.erase(it);
 
       if (il < l) {
@@ -156,10 +171,10 @@ public:
 
     for (const auto &iv : to_readd) {
       st.insert(iv);
-      total_len += (iv.second - iv.first + 1);
+      total_len += interval_len(iv.first, iv.second);
     }
 
-    return prev_total - total_len;
+    return (T)(prev_total - total_len);
   }
 
   // 単一の点 x を削除
@@ -211,23 +226,37 @@ public:
   // 【用途】ABC228D (Linear Probing), ゲーム木の mex 遷移, 重複なし採番など
   T mex(T x = 0) const {
     auto it = st.upper_bound({x, INF});
-    if (it == st.begin()) return x;
-    --it;
-    if (it->first <= x && x <= it->second) {
-      return it->second + 1;
+    if (it != st.begin()) {
+      auto pit = std::prev(it);
+      if (pit->first <= x && x <= pit->second) {
+        it = pit;
+      }
     }
-    return x;
+    T cur = x;
+    while (it != st.end() && it->first <= cur) {
+      if (it->second >= cur) {
+        assert(it->second < MAX_VAL);
+        cur = it->second + 1;
+      }
+      ++it;
+    }
+    return cur;
   }
 
   // 点 x 以下の最大の「被覆されていない」整数を取得
   T prev_absent(T x) const {
     auto it = st.upper_bound({x, INF});
-    if (it == st.begin()) return x;
-    --it;
-    if (it->first <= x && x <= it->second) {
-      return it->first - 1;
+    T cur = x;
+    while (it != st.begin()) {
+      --it;
+      if (it->second < cur)
+        break;
+      if (it->first <= cur) {
+        assert(it->first > MIN_VAL);
+        cur = it->first - 1;
+      }
     }
-    return x;
+    return cur;
   }
 
   // --------------------------------------------------------------------------
@@ -243,24 +272,24 @@ public:
     auto it = st.upper_bound({l, INF});
     if (it != st.begin()) {
       auto pit = std::prev(it);
-      if (pit->second + (merge_adj ? 1 : 0) >= l) {
+      if (touches_or_overlaps(pit->second, l)) {
         it = pit;
       }
     }
 
     T nl = l, nr = r;
-    T removed_len = 0;
+    LenT removed_len = 0;
 
-    while (it != st.end() && it->first <= r + (merge_adj ? 1 : 0)) {
+    while (it != st.end() && touches_or_overlaps(r, it->first)) {
       nl = std::min(nl, it->first);
       nr = std::max(nr, it->second);
-      removed_len += (it->second - it->first + 1);
+      removed_len += interval_len(it->first, it->second);
       on_erase(it->first, it->second);
       it = st.erase(it);
     }
 
     st.insert({nl, nr});
-    total_len += ((nr - nl + 1) - removed_len);
+    total_len += (interval_len(nl, nr) - removed_len);
     on_add(nl, nr);
     return {nl, nr};
   }
@@ -282,7 +311,7 @@ public:
     while (it != st.end() && it->first <= r) {
       T il = it->first;
       T ir = it->second;
-      total_len -= (ir - il + 1);
+      total_len -= interval_len(il, ir);
       on_erase(il, ir);
       it = st.erase(it);
 
@@ -296,7 +325,7 @@ public:
 
     for (const auto &iv : to_readd) {
       st.insert(iv);
-      total_len += (iv.second - iv.first + 1);
+      total_len += interval_len(iv.first, iv.second);
       on_add(iv.first, iv.second);
     }
   }
@@ -316,6 +345,8 @@ public:
       if (it != st.begin()) {
         auto pit = std::prev(it);
         if (pit->second >= cur) {
+          if (pit->second >= r)
+            break;
           cur = pit->second + 1;
           continue;
         }
@@ -327,6 +358,8 @@ public:
       }
       if (cur <= nxt) {
         on_new_interval(cur, nxt);
+        if (nxt == r)
+          break;
         cur = nxt + 1;
       }
     }
@@ -386,7 +419,8 @@ public:
 
   // 初期区間 [l, r] を初期値 val で構築
   IntervalMap(T l, T r, V val) {
-    st.insert({l, r, val});
+    if (l <= r)
+      st.insert({l, r, val});
   }
 
   bool empty() const { return st.empty(); }
@@ -397,27 +431,27 @@ public:
   auto end() const { return st.end(); }
 
   // 点 x で区間を分割し、[l, x-1] と [x, r] に切り分ける
-  // 戻り値: [x, r] を指すイテレータ
+  // 戻り値: [x, r] (または x 以上で最初の区間) を指すイテレータ
   SetIterator split(T x) {
-    auto it = st.upper_bound({x, 0, V()});
-    if (it != st.begin()) {
-      --it;
-      if (it->l <= x && x <= it->r) {
-        if (it->l == x) return it;
-        T l = it->l, r = it->r;
-        V v = it->val;
-        st.erase(it);
-        st.insert({l, x - 1, v});
-        return st.insert({x, r, v}).first;
-      }
-    }
-    return st.end();
+    auto it = st.lower_bound({x, x, V()});
+    if (it != st.end() && it->l == x)
+      return it;
+    if (it == st.begin())
+      return it;
+    auto pit = std::prev(it);
+    if (pit->r < x)
+      return it;
+    T l = pit->l, r = pit->r;
+    V v = pit->val;
+    st.erase(pit);
+    st.insert({l, x - 1, v});
+    return st.insert({x, r, v}).first;
   }
 
   // 区間 [l, r] の値を一括して val に更新する (ならし O(log N))
   void assign(T l, T r, V val) {
     if (l > r) return;
-    auto itr = split(r + 1);
+    auto itr = (r == std::numeric_limits<T>::max()) ? st.end() : split(r + 1);
     auto itl = split(l);
     st.erase(itl, itr);
     st.insert({l, r, val});
@@ -436,7 +470,7 @@ public:
   template <typename Func>
   void for_each(T l, T r, Func fn) {
     if (l > r) return;
-    auto itr = split(r + 1);
+    auto itr = (r == std::numeric_limits<T>::max()) ? st.end() : split(r + 1);
     auto itl = split(l);
     for (auto it = itl; it != itr; ++it) {
       fn(it->l, it->r, it->val);

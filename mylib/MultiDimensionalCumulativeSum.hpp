@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstdint>
 #include <iostream>
 #include <numeric>
 #include <vector>
@@ -37,21 +38,22 @@ using namespace std;
 // ----------------------------------------------------------------------------
 template <typename T = long long, size_t D = 3>
 class MultiDimensionalPrefixSum {
-  static_assert(D >= 3, "MultiDimensionalPrefixSum is intended for D >= 3.");
+  static_assert(D >= 3 && D < 63,
+                "MultiDimensionalPrefixSum is intended for 3 <= D < 63.");
 
 public:
   using Point = std::array<int, D>;
 
 private:
   Point shape{};
-  std::array<int, D + 1> stride{};
+  std::array<size_t, D + 1> stride{};
   std::vector<T> data;
   bool built = false;
 
-  int flat_idx(const Point &p) const {
-    int idx = 0;
+  size_t flat_idx(const Point &p) const {
+    size_t idx = 0;
     for (size_t k = 0; k < D; ++k) {
-      idx += p[k] * stride[k + 1];
+      idx += (size_t)p[k] * stride[k + 1];
     }
     return idx;
   }
@@ -62,7 +64,8 @@ public:
   explicit MultiDimensionalPrefixSum(const Point &shp) : shape(shp) {
     stride[D] = 1;
     for (int k = (int)D - 1; k >= 0; --k) {
-      stride[k] = stride[k + 1] * (shape[k] + 1);
+      assert(shape[k] >= 0);
+      stride[k] = stride[k + 1] * (size_t)(shape[k] + 1);
     }
     data.assign(stride[0], T(0));
   }
@@ -73,7 +76,8 @@ public:
     for (int s : shp_list) shape[idx++] = s;
     stride[D] = 1;
     for (int k = (int)D - 1; k >= 0; --k) {
-      stride[k] = stride[k + 1] * (shape[k] + 1);
+      assert(shape[k] >= 0);
+      stride[k] = stride[k + 1] * (size_t)(shape[k] + 1);
     }
     data.assign(stride[0], T(0));
   }
@@ -104,16 +108,18 @@ public:
   void build() {
     assert(!built);
     built = true;
+    if (data.empty())
+      return;
     for (size_t dim = 0; dim < D; ++dim) {
-      int step = stride[dim + 1];
-      int outer_count = stride[0] / stride[dim];
-      int dim_len = shape[dim] + 1;
-      for (int outer = 0; outer < outer_count; ++outer) {
-        int base = outer * stride[dim];
-        for (int coord = 1; coord < dim_len; ++coord) {
-          int src = base + (coord - 1) * step;
-          int dst = base + coord * step;
-          for (int inner = 0; inner < step; ++inner) {
+      size_t step = stride[dim + 1];
+      size_t outer_count = stride[0] / stride[dim];
+      size_t dim_len = (size_t)(shape[dim] + 1);
+      for (size_t outer = 0; outer < outer_count; ++outer) {
+        size_t base = outer * stride[dim];
+        for (size_t coord = 1; coord < dim_len; ++coord) {
+          size_t src = base + (coord - 1) * step;
+          size_t dst = base + coord * step;
+          for (size_t inner = 0; inner < step; ++inner) {
             data[dst + inner] += data[src + inner];
           }
         }
@@ -140,11 +146,11 @@ public:
       assert(0 <= l[k] && r[k] <= shape[k]);
     }
     T res = 0;
-    for (int mask = 0; mask < (1 << D); ++mask) {
+    for (uint64_t mask = 0; mask < (1ULL << D); ++mask) {
       Point coords;
       int popcount = 0;
       for (size_t k = 0; k < D; ++k) {
-        if (mask & (1 << k)) {
+        if (mask & (1ULL << k)) {
           coords[k] = l[k];
           popcount++;
         } else {
@@ -178,21 +184,22 @@ public:
 // ----------------------------------------------------------------------------
 template <typename T = long long, size_t D = 3>
 class MultiDimensionalImos {
-  static_assert(D >= 3, "MultiDimensionalImos is intended for D >= 3.");
+  static_assert(D >= 3 && D < 63,
+                "MultiDimensionalImos is intended for 3 <= D < 63.");
 
 public:
   using Point = std::array<int, D>;
 
 private:
   Point shape{};
-  std::array<int, D + 1> stride{};
+  std::array<size_t, D + 1> stride{};
   std::vector<T> diff;
   bool built = false;
 
-  int flat_idx(const Point &p) const {
-    int idx = 0;
+  size_t flat_idx(const Point &p) const {
+    size_t idx = 0;
     for (size_t k = 0; k < D; ++k) {
-      idx += p[k] * stride[k + 1];
+      idx += (size_t)p[k] * stride[k + 1];
     }
     return idx;
   }
@@ -203,7 +210,8 @@ public:
   explicit MultiDimensionalImos(const Point &shp) : shape(shp) {
     stride[D] = 1;
     for (int k = (int)D - 1; k >= 0; --k) {
-      stride[k] = stride[k + 1] * (shape[k] + 1);
+      assert(shape[k] >= 0);
+      stride[k] = stride[k + 1] * (size_t)(shape[k] + 1);
     }
     diff.assign(stride[0], T(0));
   }
@@ -214,7 +222,8 @@ public:
     for (int s : shp_list) shape[idx++] = s;
     stride[D] = 1;
     for (int k = (int)D - 1; k >= 0; --k) {
-      stride[k] = stride[k + 1] * (shape[k] + 1);
+      assert(shape[k] >= 0);
+      stride[k] = stride[k + 1] * (size_t)(shape[k] + 1);
     }
     diff.assign(stride[0], T(0));
   }
@@ -226,11 +235,11 @@ public:
       if (l[k] >= r[k]) return;
       assert(0 <= l[k] && r[k] <= shape[k]);
     }
-    for (int mask = 0; mask < (1 << D); ++mask) {
+    for (uint64_t mask = 0; mask < (1ULL << D); ++mask) {
       Point coords;
       int popcount = 0;
       for (size_t k = 0; k < D; ++k) {
-        if (mask & (1 << k)) {
+        if (mask & (1ULL << k)) {
           coords[k] = r[k];
           popcount++;
         } else {
@@ -246,16 +255,18 @@ public:
   void build() {
     assert(!built);
     built = true;
+    if (diff.empty())
+      return;
     for (size_t dim = 0; dim < D; ++dim) {
-      int step = stride[dim + 1];
-      int outer_count = stride[0] / stride[dim];
-      int dim_len = shape[dim] + 1;
-      for (int outer = 0; outer < outer_count; ++outer) {
-        int base = outer * stride[dim];
-        for (int coord = 1; coord < dim_len; ++coord) {
-          int src = base + (coord - 1) * step;
-          int dst = base + coord * step;
-          for (int inner = 0; inner < step; ++inner) {
+      size_t step = stride[dim + 1];
+      size_t outer_count = stride[0] / stride[dim];
+      size_t dim_len = (size_t)(shape[dim] + 1);
+      for (size_t outer = 0; outer < outer_count; ++outer) {
+        size_t base = outer * stride[dim];
+        for (size_t coord = 1; coord < dim_len; ++coord) {
+          size_t src = base + (coord - 1) * step;
+          size_t dst = base + coord * step;
+          for (size_t inner = 0; inner < step; ++inner) {
             diff[dst + inner] += diff[src + inner];
           }
         }
@@ -283,14 +294,14 @@ class DynamicPrefixSumND {
 private:
   int D = 0;
   std::vector<int> shape;
-  std::vector<int> stride;
+  std::vector<size_t> stride;
   std::vector<T> data;
   bool built = false;
 
-  int flat_idx(const std::vector<int> &p) const {
-    int idx = 0;
+  size_t flat_idx(const std::vector<int> &p) const {
+    size_t idx = 0;
     for (int k = 0; k < D; ++k) {
-      idx += p[k] * stride[k + 1];
+      idx += (size_t)p[k] * stride[k + 1];
     }
     return idx;
   }
@@ -299,10 +310,12 @@ public:
   DynamicPrefixSumND() {}
   explicit DynamicPrefixSumND(const std::vector<int> &shp) : shape(shp) {
     D = (int)shape.size();
-    assert(D >= 3 && "DynamicPrefixSumND is intended for D >= 3.");
+    assert(D >= 3 && D < 63 &&
+           "DynamicPrefixSumND is intended for 3 <= D < 63.");
     stride.assign(D + 1, 1);
     for (int k = D - 1; k >= 0; --k) {
-      stride[k] = stride[k + 1] * (shape[k] + 1);
+      assert(shape[k] >= 0);
+      stride[k] = stride[k + 1] * (size_t)(shape[k] + 1);
     }
     data.assign(stride[0], T(0));
   }
@@ -321,16 +334,18 @@ public:
   void build() {
     assert(!built);
     built = true;
+    if (data.empty())
+      return;
     for (int dim = 0; dim < D; ++dim) {
-      int step = stride[dim + 1];
-      int outer_count = stride[0] / stride[dim];
-      int dim_len = shape[dim] + 1;
-      for (int outer = 0; outer < outer_count; ++outer) {
-        int base = outer * stride[dim];
-        for (int coord = 1; coord < dim_len; ++coord) {
-          int src = base + (coord - 1) * step;
-          int dst = base + coord * step;
-          for (int inner = 0; inner < step; ++inner) {
+      size_t step = stride[dim + 1];
+      size_t outer_count = stride[0] / stride[dim];
+      size_t dim_len = (size_t)(shape[dim] + 1);
+      for (size_t outer = 0; outer < outer_count; ++outer) {
+        size_t base = outer * stride[dim];
+        for (size_t coord = 1; coord < dim_len; ++coord) {
+          size_t src = base + (coord - 1) * step;
+          size_t dst = base + coord * step;
+          for (size_t inner = 0; inner < step; ++inner) {
             data[dst + inner] += data[src + inner];
           }
         }
@@ -346,11 +361,11 @@ public:
       assert(0 <= l[k] && r[k] <= shape[k]);
     }
     T res = 0;
-    for (int mask = 0; mask < (1 << D); ++mask) {
+    for (uint64_t mask = 0; mask < (1ULL << D); ++mask) {
       std::vector<int> coords(D);
       int popcount = 0;
       for (int k = 0; k < D; ++k) {
-        if (mask & (1 << k)) {
+        if (mask & (1ULL << k)) {
           coords[k] = l[k];
           popcount++;
         } else {
@@ -370,14 +385,14 @@ class DynamicImosND {
 private:
   int D = 0;
   std::vector<int> shape;
-  std::vector<int> stride;
+  std::vector<size_t> stride;
   std::vector<T> diff;
   bool built = false;
 
-  int flat_idx(const std::vector<int> &p) const {
-    int idx = 0;
+  size_t flat_idx(const std::vector<int> &p) const {
+    size_t idx = 0;
     for (int k = 0; k < D; ++k) {
-      idx += p[k] * stride[k + 1];
+      idx += (size_t)p[k] * stride[k + 1];
     }
     return idx;
   }
@@ -386,10 +401,11 @@ public:
   DynamicImosND() {}
   explicit DynamicImosND(const std::vector<int> &shp) : shape(shp) {
     D = (int)shape.size();
-    assert(D >= 3 && "DynamicImosND is intended for D >= 3.");
+    assert(D >= 3 && D < 63 && "DynamicImosND is intended for 3 <= D < 63.");
     stride.assign(D + 1, 1);
     for (int k = D - 1; k >= 0; --k) {
-      stride[k] = stride[k + 1] * (shape[k] + 1);
+      assert(shape[k] >= 0);
+      stride[k] = stride[k + 1] * (size_t)(shape[k] + 1);
     }
     diff.assign(stride[0], T(0));
   }
@@ -401,11 +417,11 @@ public:
       if (l[k] >= r[k]) return;
       assert(0 <= l[k] && r[k] <= shape[k]);
     }
-    for (int mask = 0; mask < (1 << D); ++mask) {
+    for (uint64_t mask = 0; mask < (1ULL << D); ++mask) {
       std::vector<int> coords(D);
       int popcount = 0;
       for (int k = 0; k < D; ++k) {
-        if (mask & (1 << k)) {
+        if (mask & (1ULL << k)) {
           coords[k] = r[k];
           popcount++;
         } else {
@@ -420,16 +436,18 @@ public:
   void build() {
     assert(!built);
     built = true;
+    if (diff.empty())
+      return;
     for (int dim = 0; dim < D; ++dim) {
-      int step = stride[dim + 1];
-      int outer_count = stride[0] / stride[dim];
-      int dim_len = shape[dim] + 1;
-      for (int outer = 0; outer < outer_count; ++outer) {
-        int base = outer * stride[dim];
-        for (int coord = 1; coord < dim_len; ++coord) {
-          int src = base + (coord - 1) * step;
-          int dst = base + coord * step;
-          for (int inner = 0; inner < step; ++inner) {
+      size_t step = stride[dim + 1];
+      size_t outer_count = stride[0] / stride[dim];
+      size_t dim_len = (size_t)(shape[dim] + 1);
+      for (size_t outer = 0; outer < outer_count; ++outer) {
+        size_t base = outer * stride[dim];
+        for (size_t coord = 1; coord < dim_len; ++coord) {
+          size_t src = base + (coord - 1) * step;
+          size_t dst = base + coord * step;
+          for (size_t inner = 0; inner < step; ++inner) {
             diff[dst + inner] += diff[src + inner];
           }
         }

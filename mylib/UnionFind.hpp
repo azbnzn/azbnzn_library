@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <cassert>
 #include <numeric>
 #include <vector>
 
@@ -11,6 +12,7 @@ struct UnionFind {
   UnionFind(int n) : parent_or_size(n, -1) {}
 
   int root(int x) {
+    assert(0 <= x && x < (int)parent_or_size.size());
     if (parent_or_size[x] < 0)
       return x;
     return parent_or_size[x] = root(parent_or_size[x]);
@@ -37,7 +39,6 @@ struct UnionFind {
   // 全連結成分のグループ一覧を取得 (ACL dsu::groups() 互換)
   std::vector<std::vector<int>> groups() {
     int n = parent_or_size.size();
-    std::vector<std::vector<int>> result;
     std::vector<int> leader_buf(n);
     std::vector<int> group_size(n, 0);
     for (int i = 0; i < n; i++) {

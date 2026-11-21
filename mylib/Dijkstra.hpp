@@ -3,13 +3,42 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <optional>
 #include <queue>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 using namespace std;
+
+namespace dijkstra_internal {
+
+template <typename T> inline T add_saturated(T a, T b) {
+  if constexpr (is_integral_v<T> && sizeof(T) <= 8) {
+    if constexpr (is_signed_v<T>) {
+      __int128 res = (__int128)a + (__int128)b;
+      constexpr __int128 hi = (__int128)numeric_limits<T>::max();
+      return res >= hi ? numeric_limits<T>::max() : (T)res;
+    } else {
+      unsigned __int128 res = (unsigned __int128)a + (unsigned __int128)b;
+      constexpr unsigned __int128 hi =
+          (unsigned __int128)numeric_limits<T>::max();
+      return res >= hi ? numeric_limits<T>::max() : (T)res;
+    }
+  } else if constexpr (is_same_v<T, __int128_t>) {
+    constexpr T hi = (T)((((unsigned __int128)1) << 127) - 1);
+    return (b > hi - a) ? hi : (a + b);
+  } else if constexpr (is_same_v<T, unsigned __int128>) {
+    constexpr T hi = ~(T)0;
+    return (b > hi - a) ? hi : (a + b);
+  } else {
+    return a + b;
+  }
+}
+
+} // namespace dijkstra_internal
 
 // ============================================================================
 // ダイクストラ法 (Dijkstra's Algorithm) O((V + E) log V)
@@ -118,7 +147,7 @@ public:
       for (int eid : adj_[u]) {
         const auto &e = edges_[eid];
         int v = e.to;
-        T nc = c + e.cost;
+        T nc = dijkstra_internal::add_saturated(c, e.cost);
         if (!reached_[v] || nc < dist_[v]) {
           reached_[v] = 1;
           dist_[v] = nc;
@@ -201,7 +230,7 @@ dijkstra(const vector<vector<pair<int, long long>>> &g, int start_pos) {
       int to = edge.first;
       long long cost = edge.second;
       assert(cost >= 0);
-      long long nc = c + cost;
+      long long nc = dijkstra_internal::add_saturated(c, cost);
       if (dist[to] == -1 || nc < dist[to]) {
         dist[to] = nc;
         todo.push({nc, to});
@@ -250,7 +279,7 @@ dijkstra_with_path(const vector<vector<pair<int, long long>>> &g,
       int to = edge.first;
       long long cost = edge.second;
       assert(cost >= 0);
-      long long nc = c + cost;
+      long long nc = dijkstra_internal::add_saturated(c, cost);
       if (dist[to] == -1 || nc < dist[to]) {
         dist[to] = nc;
         prev_node[to] = p;
@@ -301,9 +330,11 @@ inline vector<vector<T>> dijkstra_grid(int h, int w,
       if (nx < 0 || nx >= h || ny < 0 || ny >= w)
         continue;
       T w_step = (T)step_cost(x, y, nx, ny);
-      if (w_step < 0)
-        continue;
-      T nc = c + w_step;
+      if constexpr (is_signed_v<T>) {
+        if (w_step < 0)
+          continue;
+      }
+      T nc = dijkstra_internal::add_saturated(c, w_step);
       if (!reached[nx][ny] || nc < dist[nx][ny]) {
         reached[nx][ny] = 1;
         dist[nx][ny] = nc;

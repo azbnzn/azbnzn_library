@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <random>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -46,6 +47,29 @@ struct DoubleRollingHash {
     return (uint64_t)t;
   }
 
+  template <typename T> static inline uint64_t normalize_val(T x) {
+    if constexpr (is_signed_v<T> || is_same_v<T, __int128_t>) {
+      __int128 v = (__int128)x % (__int128)mod;
+      if (v < 0)
+        v += (__int128)mod;
+      return (uint64_t)v;
+    } else {
+      return (uint64_t)((__uint128_t)x % mod);
+    }
+  }
+
+  static inline uint64_t pow_mod(uint64_t base, long long exp) {
+    uint64_t res = 1;
+    uint64_t a = base % mod;
+    while (exp > 0) {
+      if (exp & 1)
+        res = mul(res, a);
+      a = mul(a, a);
+      exp >>= 1;
+    }
+    return res;
+  }
+
   // 乱数による基数生成
   static inline uint64_t generate_base() {
     static mt19937_64 mt(
@@ -67,8 +91,13 @@ struct DoubleRollingHash {
     return {b1, b2};
   }
 
-  DoubleRollingHash()
-      : base1(0), base2(0), n(0), seg_sz(0), seg_built(false) {}
+  DoubleRollingHash() : n(0), seg_sz(0), seg_built(false) {
+    auto [b1, b2] = get_default_bases();
+    base1 = b1;
+    base2 = b2;
+    power1.assign(1, 1);
+    power2.assign(1, 1);
+  }
 
   // 文字列から構築 (共有基数を使用)
   DoubleRollingHash(const string &s) {
@@ -93,7 +122,10 @@ struct DoubleRollingHash {
   }
 
   void init(const string &s, uint64_t b1, uint64_t b2) {
-    vector<uint64_t> v(s.begin(), s.end());
+    vector<uint64_t> v(s.size());
+    for (size_t i = 0; i < s.size(); i++) {
+      v[i] = (unsigned char)s[i];
+    }
     init(v, b1, b2);
   }
 
@@ -104,7 +136,7 @@ struct DoubleRollingHash {
     n = v.size();
     origin.resize(n);
     for (int i = 0; i < n; i++) {
-      origin[i] = (uint64_t)v[i] % mod;
+      origin[i] = normalize_val(v[i]);
     }
 
     hash1.assign(n + 1, 0);
@@ -163,7 +195,7 @@ struct DoubleRollingHash {
   template <typename T> void set(int idx, T val) {
     assert(0 <= idx && idx < n);
     ensure_seg_tree();
-    uint64_t v = (uint64_t)val % mod;
+    uint64_t v = normalize_val(val);
     origin[idx] = v;
     int k = seg_sz + idx;
     seg[k] = make_leaf(v);
@@ -188,7 +220,7 @@ struct DoubleRollingHash {
       return {h1, h2};
 
     uint64_t old_v = origin[idx];
-    uint64_t new_v = (uint64_t)new_val % mod;
+    uint64_t new_v = normalize_val(new_val);
     int shift = r - 1 - idx;
 
     uint64_t diff1 = mul((new_v + mod - old_v) % mod, power1[shift]);
@@ -234,11 +266,17 @@ struct DoubleRollingHash {
   // ハッシュ同士の結合 (h1 の後ろに長さ len2 の h2 を連結)
   pair<uint64_t, uint64_t> concat(pair<uint64_t, uint64_t> h1,
                                  pair<uint64_t, uint64_t> h2, int len2) const {
-    uint64_t res1 = mul(h1.first, power1[len2]) + h2.first;
+    assert(len2 >= 0);
+    uint64_t p1 =
+        (len2 < (int)power1.size()) ? power1[len2] : pow_mod(base1, len2);
+    uint64_t p2 =
+        (len2 < (int)power2.size()) ? power2[len2] : pow_mod(base2, len2);
+
+    uint64_t res1 = mul(h1.first, p1) + h2.first;
     if (res1 >= mod)
       res1 -= mod;
 
-    uint64_t res2 = mul(h1.second, power2[len2]) + h2.second;
+    uint64_t res2 = mul(h1.second, p2) + h2.second;
     if (res2 >= mod)
       res2 -= mod;
 

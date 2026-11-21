@@ -6,7 +6,7 @@ using namespace std;
 // Kahnのアルゴリズムによるトポロジカルソート
 // g: 有向グラフの隣接リスト
 // 戻り値: トポロジカル順序の頂点列 (閉路が存在しDAGでない場合は空の配列を返す)
-vector<int> topological_sort(const vector<vector<int>> &g) {
+inline vector<int> topological_sort(const vector<vector<int>> &g) {
   int n = g.size();
   vector<int> in_degree(n, 0);
   for (int i = 0; i < n; i++) {

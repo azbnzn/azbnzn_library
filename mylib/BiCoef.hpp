@@ -17,14 +17,17 @@ template <class mint> struct BiCoef {
   void init(int n) {
     if (n < 0) return;
     fact_.assign(n + 1, 1);
-    inv_fact_.assign(n + 1, 1);
     for (int i = 1; i <= n; i++) {
       fact_[i] = fact_[i - 1] * i;
     }
+    int max_inv = n;
+    while (max_inv > 0 && fact_[max_inv] == 0)
+      max_inv--;
+    inv_fact_.assign(n + 1, 0);
     // ACLのmodintは .inv() メソッドを持つのでそのまま呼べる
-    inv_fact_[n] = fact_[n].inv();
+    inv_fact_[max_inv] = fact_[max_inv].inv();
     // 逆元の計算は後ろからやると高速 (O(1)回の逆元計算で済む)
-    for (int i = n; i > 0; i--) {
+    for (int i = max_inv; i > 0; i--) {
       inv_fact_[i - 1] = inv_fact_[i] * i;
     }
   }
@@ -63,6 +66,9 @@ template <class mint> struct BiCoef {
       return 0;
     if (n == 0 && r == 0)
       return 1;
-    return C(n + r - 1, r);
+    long long s = (long long)n + r - 1;
+    if (s < 0 || s >= (long long)fact_.size())
+      return 0;
+    return C((int)s, r);
   }
 };

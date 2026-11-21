@@ -132,14 +132,15 @@ struct ZobristPermutationTable {
 
   Hash128 get(long long start, int len) {
     if (len <= 0) return Hash128(0, 0);
-    if (start >= 1 && start + len - 1 <= 2000000) {
-      extend(start + len - 1);
+    if (start >= 1 && start <= 2000000 && len - 1 <= 2000000 - start) {
+      extend((int)(start + len - 1));
       return pref_add[start + len - 1] - pref_add[start - 1];
     }
     // start が 1..2000000 の範囲外の場合はループ計算
     Hash128 res(0, 0);
     for (int i = 0; i < len; ++i) {
-      res += zobrist_hash_value(start + i);
+      uint64_t val = static_cast<uint64_t>(start) + static_cast<uint64_t>(i);
+      res += zobrist_hash_value(val);
     }
     return res;
   }
@@ -254,9 +255,7 @@ struct DynamicZobristHash {
 
   DynamicZobristHash(int n, T default_val = T())
       : n(n), data(n, default_val), bit_add(n + 1, Hash128(0, 0)), bit_xor(n + 1, Hash128(0, 0)) {
-    if (default_val != T()) {
-      build(data);
-    }
+    build(data);
   }
 
   DynamicZobristHash(const vector<T> &a)
@@ -265,7 +264,10 @@ struct DynamicZobristHash {
   }
 
   void build(const vector<T> &a) {
+    n = (int)a.size();
     data = a;
+    bit_add.assign(n + 1, Hash128(0, 0));
+    bit_xor.assign(n + 1, Hash128(0, 0));
     for (int i = 0; i < n; ++i) {
       Hash128 h = zobrist_hash_value(a[i]);
       bit_add[i + 1] = h;
@@ -514,12 +516,18 @@ struct ZobristGrid {
 
   ZobristGrid(int h, int w, int num_states = 2)
       : h(h), w(w), num_states(num_states), grid(h, vector<int>(w, 0)), current_hash(0, 0) {
+    assert(h >= 0 && w >= 0 && num_states > 0);
     table.resize(h, vector<vector<Hash128>>(w, vector<Hash128>(num_states)));
+    uint64_t idx = 0;
     for (int r = 0; r < h; ++r) {
       for (int c = 0; c < w; ++c) {
         for (int v = 0; v < num_states; ++v) {
-          uint64_t key = ((uint64_t)r << 32) ^ ((uint64_t)c << 16) ^ (uint64_t)v;
-          table[r][c][v] = zobrist_hash_value(key);
+          uint64_t k = idx++;
+          uint64_t v1 = zobrist_internal::splitmix64(
+              k ^ zobrist_internal::get_random_seed1() ^ 0x9e3779b97f4a7c15ULL);
+          uint64_t v2 = zobrist_internal::splitmix64(
+              k ^ zobrist_internal::get_random_seed2() ^ 0xbf58476d1ce4e5b9ULL);
+          table[r][c][v] = Hash128(v1, v2);
         }
         current_hash ^= table[r][c][0];
       }

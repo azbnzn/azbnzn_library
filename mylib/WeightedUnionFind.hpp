@@ -3,6 +3,7 @@
 #include <cassert>
 #include <iostream>
 #include <numeric>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -13,9 +14,12 @@ using namespace std;
 //
 // Type: ポテンシャルの型 (通常 long long や int, double など)
 template <typename Type = long long> struct WeightedUnionFind {
+  using CalcT =
+      conditional_t<is_integral_v<Type> && sizeof(Type) <= 8, __int128_t, Type>;
+
   int n;
   vector<int> parent_or_size;
-  vector<Type> diff_weight; // 親ノードに対する相対ポテンシャル: V[x] - V[parent[x]]
+  vector<CalcT> diff_weight; // 親ノードに対する相対ポテンシャル: V[x] - V[parent[x]]
 
   WeightedUnionFind() : n(0) {}
   explicit WeightedUnionFind(int n)
@@ -33,8 +37,7 @@ template <typename Type = long long> struct WeightedUnionFind {
 
   // 根からの相対ポテンシャル V[x] - V[root(x)] を取得
   Type weight(int x) {
-    root(x);
-    return diff_weight[x];
+    return (Type)weight_calc(x);
   }
 
   // x と y が同じ連結成分に属するか判定
@@ -43,7 +46,7 @@ template <typename Type = long long> struct WeightedUnionFind {
   // V[y] - V[x] を取得 (同じ連結成分に属している必要がある)
   Type diff(int x, int y) {
     assert(same(x, y));
-    return weight(y) - weight(x);
+    return (Type)(weight_calc(y) - weight_calc(x));
   }
 
   // V[y] - V[x] = w となるように x と y を結合する
@@ -55,16 +58,19 @@ template <typename Type = long long> struct WeightedUnionFind {
     assert(0 <= x && x < n);
     assert(0 <= y && y < n);
 
-    // root(x) と root(y) の差に換算:
-    // w_root = V[root(y)] - V[root(x)] = weight(x) + w - weight(y)
-    Type w_root = weight(x) + w - weight(y);
+    CalcT wx = weight_calc(x);
+    CalcT wy = weight_calc(y);
     int rx = root(x);
     int ry = root(y);
 
     if (rx == ry) {
       // 矛盾判定
-      return diff(x, y) == w;
+      return (wy - wx) == (CalcT)w;
     }
+
+    // root(x) と root(y) の差に換算:
+    // w_root = V[root(y)] - V[root(x)] = weight(x) + w - weight(y)
+    CalcT w_root = wx + (CalcT)w - wy;
 
     // サイズによる結合 (Union by size)
     if (-parent_or_size[rx] < -parent_or_size[ry]) {
@@ -77,6 +83,14 @@ template <typename Type = long long> struct WeightedUnionFind {
     diff_weight[ry] = w_root;
     return true;
   }
+
+private:
+  CalcT weight_calc(int x) {
+    root(x);
+    return diff_weight[x];
+  }
+
+public:
 
   // x が属する連結成分のサイズ
   int size(int x) { return -parent_or_size[root(x)]; }

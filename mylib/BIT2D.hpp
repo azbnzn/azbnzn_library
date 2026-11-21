@@ -1,6 +1,8 @@
 #pragma once
+#include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <type_traits>
 #include <vector>
 
 using namespace std;
@@ -39,13 +41,14 @@ private:
   int H = 0, W = 0;
   std::vector<T> tree;
 
-  inline int id(int r, int c) const {
-    return r * (W + 1) + c;
+  inline size_t id(int r, int c) const {
+    return (size_t)r * (size_t)(W + 1) + (size_t)c;
   }
 
 public:
   BIT2D() {}
-  BIT2D(int h, int w) : H(h), W(w), tree((h + 1) * (w + 1), T(0)) {}
+  BIT2D(int h, int w)
+      : H(h), W(w), tree((size_t)(h + 1) * (size_t)(w + 1), T(0)) {}
 
   // 点 (r, c) に val を加算 (O(log H log W))
   void add(int r, int c, T val) {
@@ -125,14 +128,25 @@ public:
 template <typename T = long long>
 class RangeAddBIT2D {
 private:
+  using CalcT =
+      std::conditional_t<std::is_integral_v<T> && sizeof(T) <= 8, __int128_t, T>;
   int H = 0, W = 0;
-  BIT2D<T> bit_xy, bit_x, bit_y, bit_0;
+  BIT2D<CalcT> bit_xy, bit_x, bit_y, bit_0;
 
-  void add_point(int r, int c, T val) {
+  void add_point(int r, int c, CalcT val) {
     bit_xy.add(r, c, val);
-    bit_x.add(r, c, -val * c);
-    bit_y.add(r, c, -val * r);
-    bit_0.add(r, c, val * r * c);
+    bit_x.add(r, c, -val * (CalcT)c);
+    bit_y.add(r, c, -val * (CalcT)r);
+    bit_0.add(r, c, val * (CalcT)r * (CalcT)c);
+  }
+
+  CalcT prefix_sum_calc(int r, int c) const {
+    r = std::max(0, std::min(r, H));
+    c = std::max(0, std::min(c, W));
+    return bit_xy.prefix_sum(r, c) * (CalcT)r * (CalcT)c +
+           bit_x.prefix_sum(r, c) * (CalcT)r +
+           bit_y.prefix_sum(r, c) * (CalcT)c +
+           bit_0.prefix_sum(r, c);
   }
 
 public:
@@ -146,27 +160,24 @@ public:
   void add(int r1, int c1, int r2, int c2, T val) {
     if (r1 >= r2 || c1 >= c2) return;
     assert(0 <= r1 && r2 <= H && 0 <= c1 && c2 <= W);
-    add_point(r1, c1, val);
-    add_point(r1, c2, -val);
-    add_point(r2, c1, -val);
-    add_point(r2, c2, val);
+    CalcT v = (CalcT)val;
+    add_point(r1, c1, v);
+    add_point(r1, c2, -v);
+    add_point(r2, c1, -v);
+    add_point(r2, c2, v);
   }
 
   // 半開区間 [0, r) x [0, c) のプレフィックス総和 (O(log H log W))
   T prefix_sum(int r, int c) const {
-    r = std::max(0, std::min(r, H));
-    c = std::max(0, std::min(c, W));
-    return bit_xy.prefix_sum(r, c) * r * c +
-           bit_x.prefix_sum(r, c) * r +
-           bit_y.prefix_sum(r, c) * c +
-           bit_0.prefix_sum(r, c);
+    return (T)prefix_sum_calc(r, c);
   }
 
   // 矩形区間 [r1, r2) x [c1, c2) の総和 (O(log H log W))
   T sum(int r1, int c1, int r2, int c2) const {
     if (r1 >= r2 || c1 >= c2) return T(0);
     assert(0 <= r1 && r2 <= H && 0 <= c1 && c2 <= W);
-    return prefix_sum(r2, c2) - prefix_sum(r1, c2) - prefix_sum(r2, c1) + prefix_sum(r1, c1);
+    return (T)(prefix_sum_calc(r2, c2) - prefix_sum_calc(r1, c2) -
+               prefix_sum_calc(r2, c1) + prefix_sum_calc(r1, c1));
   }
 
   // 点 (r, c) の現在の値を取得 (O(log H log W))

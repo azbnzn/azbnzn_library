@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <limits>
+#include <type_traits>
 #include <vector>
 
 using namespace std;
@@ -23,11 +25,31 @@ template <typename T, T INF> struct MinPlusSemiring {
   static T one() { return T(0); } // 乗法の単位元
   static T add(const T &a, const T &b) { return min(a, b); }
   static T mul(const T &a, const T &b) {
-    if (a == INF || b == INF)
+    if (a >= INF || b >= INF)
       return INF;
-    return a + b;
+    if constexpr (is_integral_v<T> && sizeof(T) <= 8) {
+      __int128 res = (__int128)a + (__int128)b;
+      if (res >= (__int128)INF)
+        return INF;
+      constexpr __int128 low = (__int128)numeric_limits<T>::lowest();
+      if (res <= low)
+        return numeric_limits<T>::lowest();
+      return (T)res;
+    } else if constexpr (is_same_v<T, __int128_t>) {
+      constexpr T max128 = (T)((((unsigned __int128)1) << 127) - 1);
+      constexpr T min128 = -max128 - 1;
+      if (b > 0 && a > INF - b)
+        return INF;
+      if (b < 0 && a < min128 - b)
+        return min128;
+      T res = a + b;
+      return res >= INF ? INF : res;
+    } else {
+      T res = a + b;
+      return res >= INF ? INF : res;
+    }
   }
-  static bool is_zero(const T &a) { return a == INF; }
+  static bool is_zero(const T &a) { return a >= INF; }
 };
 
 // トロピカル半環 (max, +) : 最長経路・最大スコアDP用
@@ -36,11 +58,30 @@ template <typename T, T NEG_INF> struct MaxPlusSemiring {
   static T one() { return T(0); }
   static T add(const T &a, const T &b) { return max(a, b); }
   static T mul(const T &a, const T &b) {
-    if (a == NEG_INF || b == NEG_INF)
+    if (a <= NEG_INF || b <= NEG_INF)
       return NEG_INF;
-    return a + b;
+    if constexpr (is_integral_v<T> && sizeof(T) <= 8) {
+      __int128 res = (__int128)a + (__int128)b;
+      if (res <= (__int128)NEG_INF)
+        return NEG_INF;
+      constexpr __int128 high = (__int128)numeric_limits<T>::max();
+      if (res >= high)
+        return numeric_limits<T>::max();
+      return (T)res;
+    } else if constexpr (is_same_v<T, __int128_t>) {
+      constexpr T max128 = (T)((((unsigned __int128)1) << 127) - 1);
+      if (b < 0 && a < NEG_INF - b)
+        return NEG_INF;
+      if (b > 0 && a > max128 - b)
+        return max128;
+      T res = a + b;
+      return res <= NEG_INF ? NEG_INF : res;
+    } else {
+      T res = a + b;
+      return res <= NEG_INF ? NEG_INF : res;
+    }
   }
-  static bool is_zero(const T &a) { return a == NEG_INF; }
+  static bool is_zero(const T &a) { return a <= NEG_INF; }
 };
 
 // ブール半環 (OR, AND) : グラフの到達可能性・推移閉包用

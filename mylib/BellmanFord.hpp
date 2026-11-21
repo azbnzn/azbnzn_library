@@ -104,6 +104,12 @@ template <typename T = long long> struct BellmanFord {
   };
 
 private:
+  using CalcT =
+      conditional_t<is_integral_v<T> && sizeof(T) <= 8, __int128_t, T>;
+  static constexpr CalcT CALC_INF = bf_internal::Limits<CalcT>::max_val() / 2;
+  static constexpr CalcT CALC_NEG_INF =
+      bf_internal::Limits<CalcT>::min_val() / 2;
+
   int n_;
   T eps_;
   vector<Edge> edges_;
@@ -120,32 +126,61 @@ private:
   int last_clamped_node_ = -1;
 
   // オーバーフロー安全な加算・クランプ判定
-  pair<T, bool> add_clamped(T d, T cost) const {
-    if constexpr (is_integral_v<T> && sizeof(T) <= 8) {
-      __int128 res = (__int128)d + (__int128)cost;
-      if (res <= (__int128)NEG_INF) return {NEG_INF, true};
-      if (res >= (__int128)INF) return {INF, true};
-      return {(T)res, false};
-    } else if constexpr (is_same_v<T, __int128_t>) {
-      if (cost < 0 && d < NEG_INF - cost) return {NEG_INF, true};
-      if (cost > 0 && d > INF - cost) return {INF, true};
-      T res = d + cost;
-      if (res <= NEG_INF) return {NEG_INF, true};
-      if (res >= INF) return {INF, true};
+  pair<CalcT, bool> add_clamped_calc(CalcT d, CalcT cost) const {
+    if constexpr (is_integral_v<T> || is_same_v<CalcT, __int128_t>) {
+      if (cost < 0 && d < CALC_NEG_INF - cost)
+        return {CALC_NEG_INF, true};
+      if (cost > 0 && d > CALC_INF - cost)
+        return {CALC_INF, true};
+      CalcT res = d + cost;
+      if (res <= CALC_NEG_INF)
+        return {CALC_NEG_INF, true};
+      if (res >= CALC_INF)
+        return {CALC_INF, true};
       return {res, false};
     } else {
-      T res = d + cost;
-      if (res <= NEG_INF) return {NEG_INF, true};
-      if (res >= INF) return {INF, true};
+      CalcT res = d + cost;
+      if (res <= CALC_NEG_INF)
+        return {CALC_NEG_INF, true};
+      if (res >= CALC_INF)
+        return {CALC_INF, true};
       return {res, false};
     }
   }
 
-  bool is_better(T cand, T cur, bool maximize) const {
+  bool is_better_calc(CalcT cand, CalcT cur, bool maximize) const {
     if (maximize) {
-      return cand > cur + eps_;
+      return cand > cur + (CalcT)eps_;
     } else {
-      return cand < cur - eps_;
+      return cand < cur - (CalcT)eps_;
+    }
+  }
+
+  static T clamp_finite_to_T(CalcT val) {
+    if constexpr (is_integral_v<T> && sizeof(T) <= 8) {
+      constexpr CalcT lo = (CalcT)bf_internal::Limits<T>::min_val();
+      constexpr CalcT hi = (CalcT)bf_internal::Limits<T>::max_val();
+      if (val <= lo)
+        return bf_internal::Limits<T>::min_val();
+      if (val >= hi)
+        return bf_internal::Limits<T>::max_val();
+      return (T)val;
+    } else {
+      return val;
+    }
+  }
+
+  void finalize_dists(const vector<CalcT> &calc_dist, bool maximize) {
+    T unreach_val = maximize ? NEG_INF : INF;
+    T unb_val = maximize ? INF : NEG_INF;
+    for (int i = 0; i < n_; ++i) {
+      if (state_[i] == UNREACHABLE) {
+        dist_[i] = unreach_val;
+      } else if (state_[i] == UNBOUNDED) {
+        dist_[i] = unb_val;
+      } else {
+        dist_[i] = clamp_finite_to_T(calc_dist[i]);
+      }
     }
   }
 
@@ -190,12 +225,14 @@ private:
   bool run_core(const vector<T> &init_dist, bool maximize) {
     assert((int)init_dist.size() == n_);
     reset_result(maximize);
-    if (n_ == 0) return true;
+    if (n_ == 0)
+      return true;
 
     T unreach_val = maximize ? NEG_INF : INF;
+    vector<CalcT> calc_dist(n_, maximize ? CALC_NEG_INF : CALC_INF);
     for (int i = 0; i < n_; ++i) {
       if (init_dist[i] != unreach_val) {
-        dist_[i] = init_dist[i];
+        calc_dist[i] = (CalcT)init_dist[i];
         state_[i] = FINITE;
       }
     }
@@ -205,15 +242,16 @@ private:
     for (int it = 0; it < n_; ++it) {
       bool updated = false;
       for (const auto &e : edges_) {
-        if (state_[e.from] == UNREACHABLE) continue;
-        auto [cand, clamped] = add_clamped(dist_[e.from], e.cost);
+        if (state_[e.from] == UNREACHABLE)
+          continue;
+        auto [cand, clamped] = add_clamped_calc(calc_dist[e.from], (CalcT)e.cost);
 
         if (clamped) {
-          bool hit_unb_dir = maximize ? (cand >= INF) : (cand <= NEG_INF);
+          bool hit_unb_dir = maximize ? (cand >= CALC_INF) : (cand <= CALC_NEG_INF);
           if (hit_unb_dir) {
             bool can_relax = (state_[e.to] == UNREACHABLE) || !neg_seed[e.to];
             if (can_relax) {
-              dist_[e.to] = cand;
+              calc_dist[e.to] = cand;
               state_[e.to] = FINITE;
               if (!neg_seed[e.to]) {
                 parent_[e.to] = e.from;
@@ -228,8 +266,9 @@ private:
           }
         }
 
-        if (state_[e.to] == UNREACHABLE || is_better(cand, dist_[e.to], maximize)) {
-          dist_[e.to] = cand;
+        if (state_[e.to] == UNREACHABLE ||
+            is_better_calc(cand, calc_dist[e.to], maximize)) {
+          calc_dist[e.to] = cand;
           state_[e.to] = FINITE;
           parent_[e.to] = e.from;
           parent_edge_[e.to] = e.id;
@@ -248,8 +287,10 @@ private:
 
     if (has_unbounded_) {
       propagate_unbounded_bfs(neg_seed, maximize);
+      finalize_dists(calc_dist, maximize);
       return false;
     }
+    finalize_dists(calc_dist, maximize);
     return true;
   }
 
@@ -257,10 +298,12 @@ private:
   bool run_spfa_core(const vector<T> &init_dist, bool maximize, bool find_all_unbounded) {
     assert((int)init_dist.size() == n_);
     reset_result(maximize);
-    if (n_ == 0) return true;
+    if (n_ == 0)
+      return true;
 
     T unreach_val = maximize ? NEG_INF : INF;
     T unb_val = maximize ? INF : NEG_INF;
+    vector<CalcT> calc_dist(n_, maximize ? CALC_NEG_INF : CALC_INF);
 
     queue<int> q;
     vector<bool> in_q(n_, false);
@@ -268,13 +311,14 @@ private:
 
     for (int i = 0; i < n_; ++i) {
       if (init_dist[i] != unreach_val) {
-        dist_[i] = init_dist[i];
+        calc_dist[i] = (CalcT)init_dist[i];
         state_[i] = FINITE;
         q.push(i);
         in_q[i] = true;
       }
     }
-    if (q.empty()) return true;
+    if (q.empty())
+      return true;
 
     auto mark_subtree_unbounded = [&](int root) {
       queue<int> bq;
@@ -299,7 +343,8 @@ private:
       int cur = v;
       for (int step = 1; step <= n_; ++step) {
         cur = parent_[cur];
-        if (cur == -1) return {false, step - 1};
+        if (cur == -1)
+          return {false, step - 1};
       }
       return {true, n_};
     };
@@ -316,28 +361,34 @@ private:
         for (int eid : adj_[u]) {
           const auto &e = edges_[eid];
           int v = e.to;
-          if (state_[v] == UNBOUNDED) continue;
+          if (state_[v] == UNBOUNDED)
+            continue;
 
-          auto [cand, clamped] = add_clamped(dist_[u], e.cost);
-          bool hit_unb_clamp = clamped && (maximize ? (cand >= INF) : (cand <= NEG_INF));
+          auto [cand, clamped] = add_clamped_calc(calc_dist[u], (CalcT)e.cost);
+          bool hit_unb_clamp =
+              clamped && (maximize ? (cand >= CALC_INF) : (cand <= CALC_NEG_INF));
 
           if (hit_unb_clamp) {
-            dist_[v] = cand;
+            calc_dist[v] = cand;
             parent_[v] = u;
             parent_edge_[v] = e.id;
             has_unbounded_ = true;
-            if (last_clamped_node_ == -1) last_clamped_node_ = v;
+            if (last_clamped_node_ == -1)
+              last_clamped_node_ = v;
             if (!find_all_unbounded) {
               state_[v] = UNBOUNDED;
+              finalize_dists(calc_dist, maximize);
               return false;
             }
             mark_subtree_unbounded(v);
-            if (state_[u] == UNBOUNDED) break;
+            if (state_[u] == UNBOUNDED)
+              break;
             continue;
           }
 
-          if (state_[v] == UNREACHABLE || is_better(cand, dist_[v], maximize)) {
-            dist_[v] = cand;
+          if (state_[v] == UNREACHABLE ||
+              is_better_calc(cand, calc_dist[v], maximize)) {
+            calc_dist[v] = cand;
             state_[v] = FINITE;
             parent_[v] = u;
             parent_edge_[v] = e.id;
@@ -347,14 +398,16 @@ private:
               auto [has_cyc, actual_len] = check_parent_cycle(v);
               if (has_cyc) {
                 has_unbounded_ = true;
-                if (last_cycle_node_ == -1) last_cycle_node_ = v;
+                if (last_cycle_node_ == -1)
+                  last_cycle_node_ = v;
                 if (!find_all_unbounded) {
                   state_[v] = UNBOUNDED;
-                  dist_[v] = unb_val;
+                  finalize_dists(calc_dist, maximize);
                   return false;
                 }
                 mark_subtree_unbounded(v);
-                if (state_[u] == UNBOUNDED) break;
+                if (state_[u] == UNBOUNDED)
+                  break;
                 continue;
               }
               path_len[v] = actual_len;
@@ -380,6 +433,7 @@ private:
       }
     }
 
+    finalize_dists(calc_dist, maximize);
     return !has_unbounded_;
   }
 
@@ -387,7 +441,8 @@ private:
   vector<T> walk_k_edges_core(const vector<int> &starts, int k, bool exact, bool maximize) const {
     assert(k >= 0);
     T unreach_val = maximize ? NEG_INF : INF;
-    vector<T> dp(n_, unreach_val);
+    CalcT calc_unreach = maximize ? CALC_NEG_INF : CALC_INF;
+    vector<CalcT> dp(n_, calc_unreach);
     vector<uint8_t> has(n_, 0);
     for (int s : starts) {
       assert(0 <= s && s < n_);
@@ -396,14 +451,15 @@ private:
     }
 
     for (int step = 0; step < k; ++step) {
-      vector<T> ndp = exact ? vector<T>(n_, unreach_val) : dp;
+      vector<CalcT> ndp = exact ? vector<CalcT>(n_, calc_unreach) : dp;
       vector<uint8_t> nhas = exact ? vector<uint8_t>(n_, 0) : has;
       bool changed = false;
 
       for (const auto &e : edges_) {
-        if (!has[e.from]) continue;
-        auto [cand, _] = add_clamped(dp[e.from], e.cost);
-        if (!nhas[e.to] || is_better(cand, ndp[e.to], maximize)) {
+        if (!has[e.from])
+          continue;
+        auto [cand, _] = add_clamped_calc(dp[e.from], (CalcT)e.cost);
+        if (!nhas[e.to] || is_better_calc(cand, ndp[e.to], maximize)) {
           ndp[e.to] = cand;
           nhas[e.to] = 1;
           changed = true;
@@ -411,9 +467,16 @@ private:
       }
       dp.swap(ndp);
       has.swap(nhas);
-      if (!exact && !changed) break;
+      if (!exact && !changed)
+        break;
     }
-    return dp;
+    vector<T> res(n_, unreach_val);
+    for (int i = 0; i < n_; ++i) {
+      if (has[i]) {
+        res[i] = clamp_finite_to_T(dp[i]);
+      }
+    }
+    return res;
   }
 
   // Karp のアルゴリズムによる最小/最大平均重み閉路
@@ -421,7 +484,7 @@ private:
     MeanCycleResult res;
     if (n_ == 0 || edges_.empty()) return res;
 
-    using DP_T = conditional_t<is_integral_v<T> && sizeof(T) < 8, long long, T>;
+    using DP_T = conditional_t<is_integral_v<T> && sizeof(T) <= 8, __int128_t, T>;
     constexpr DP_T DP_INF = bf_internal::Limits<DP_T>::max_val() / 2;
 
     vector<DP_T> dp((size_t)(n_ + 1) * n_, DP_INF);
@@ -432,7 +495,7 @@ private:
       size_t cur_off = (size_t)k * n_;
       for (const auto &e : edges_) {
         if (dp[prev_off + e.from] == DP_INF) continue;
-        DP_T w = maximize ? (DP_T)(-e.cost) : (DP_T)e.cost;
+        DP_T w = maximize ? -(DP_T)e.cost : (DP_T)e.cost;
         DP_T cand = dp[prev_off + e.from] + w;
         if (cand < dp[cur_off + e.to]) {
           dp[cur_off + e.to] = cand;

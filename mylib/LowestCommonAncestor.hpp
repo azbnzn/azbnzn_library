@@ -46,6 +46,8 @@ struct LowestCommonAncestor {
 
   // 根 root を指定してテーブル構築 (O(N log N))
   void build(int root = 0) {
+    if (n == 0)
+      return;
     assert(0 <= root && root < n);
     parent.assign(log_n, vector<int>(n, -1));
     depth.assign(n, 0);
@@ -95,13 +97,14 @@ struct LowestCommonAncestor {
   // 2頂点 u, v 間の重み付き最短距離を取得 (O(log N))
   T dist(int u, int v) const {
     int a = lca(u, v);
-    return dist_from_root[u] + dist_from_root[v] - 2 * dist_from_root[a];
+    return (dist_from_root[u] - dist_from_root[a]) +
+           (dist_from_root[v] - dist_from_root[a]);
   }
 
   // 2頂点 u, v 間の辺数 (重みなし最短距離) を取得 (O(log N))
   int dist_edges(int u, int v) const {
     int a = lca(u, v);
-    return depth[u] + depth[v] - 2 * depth[a];
+    return (depth[u] - depth[a]) + (depth[v] - depth[a]);
   }
 
   // 頂点 u から根方向に k 個登った頂点を取得 (存在しない場合は -1) (O(log N))

@@ -18,7 +18,7 @@ template <class S, S (*op)(S, S), S (*e)()> struct SegTree2D {
   SegTree2D() : H(0), W(0) {}
   SegTree2D(int h, int w) : H(h), W(w) {
     if (H > 0 && W > 0) {
-      dat.assign(4 * H * W, e());
+      dat.assign((size_t)4 * (size_t)H * (size_t)W, e());
     }
   }
 
@@ -33,7 +33,7 @@ template <class S, S (*op)(S, S), S (*e)()> struct SegTree2D {
     W = (H == 0 ? 0 : v[0].size());
     if (H == 0 || W == 0)
       return;
-    dat.assign(4 * H * W, e());
+    dat.assign((size_t)4 * (size_t)H * (size_t)W, e());
 
     for (int r = 0; r < H; r++) {
       for (int c = 0; c < W; c++) {
@@ -93,7 +93,9 @@ template <class S, S (*op)(S, S), S (*e)()> struct SegTree2D {
   }
 
 private:
-  inline int id(int r, int c) const { return r * 2 * W + c; }
+  inline size_t id(int r, int c) const {
+    return (size_t)r * (size_t)2 * (size_t)W + (size_t)c;
+  }
 
   S prod_col(int r, int c1, int c2) const {
     S res = e();

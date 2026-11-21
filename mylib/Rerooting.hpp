@@ -6,6 +6,8 @@
 
 using namespace std;
 
+namespace rerooting_internal {
+
 // 辺の定義
 template <typename Cost = long long> struct Edge {
   int src, to;
@@ -30,6 +32,11 @@ template <typename Cost = long long> struct Graph : vector<vector<Edge<Cost>>> {
   }
 };
 
+template <typename Data>
+inline Data default_add_node(Data d, int) { return d; }
+
+} // namespace rerooting_internal
+
 // =========================================================================
 // 1. 全方位木DP (6.cpp 互換スタイル)
 // =========================================================================
@@ -45,11 +52,11 @@ template <typename Cost, typename Data,
           Data (*e)(),
           Data (*leaf)(),
           Data (*apply)(Data, int, int, Cost)>
-struct Rerooting : Graph<Cost> {
+struct Rerooting : rerooting_internal::Graph<Cost> {
   vector<Data> dp;   // 各頂点を根としたときの木全体の答え
   vector<Data> memo; // dfs1 での部分木の答え
 
-  Rerooting(int n = 0) : Graph<Cost>(n) {}
+  Rerooting(int n = 0) : rerooting_internal::Graph<Cost>(n) {}
 
   // 全方位木DPを実行し、各頂点を根としたときの答えの配列を返す
   vector<Data> run(int root = 0) {
@@ -73,7 +80,7 @@ struct Rerooting : Graph<Cost> {
 private:
   void dfs1(int c, int p) {
     bool upd = false;
-    for (Edge<Cost> &d : (*this)[c]) {
+    for (rerooting_internal::Edge<Cost> &d : (*this)[c]) {
       if (d == p)
         continue;
       dfs1(d, c);
@@ -86,7 +93,7 @@ private:
 
   void dfs2(int c, int p, const Data &val) {
     vector<Data> ds{val};
-    for (Edge<Cost> &d : (*this)[c]) {
+    for (rerooting_internal::Edge<Cost> &d : (*this)[c]) {
       if (d == p)
         continue;
       ds.push_back(apply(memo[d], d, c, d.cost));
@@ -98,10 +105,10 @@ private:
     for (int i = n; i-- > 0;)
       tail[i] = merge(ds[i], tail[i + 1]);
     dp[c] = head[n];
-    for (Edge<Cost> &d : (*this)[c]) {
+    for (rerooting_internal::Edge<Cost> &d : (*this)[c]) {
       if (d == p)
         continue;
-      Data sub = merge(head[idx], tail[idx + 1]);
+      Data sub = (p == -1 && n == 2) ? leaf() : merge(head[idx], tail[idx + 1]);
       dfs2(d, c, apply(sub, c, d, d.cost));
       idx++;
     }
@@ -118,21 +125,16 @@ private:
 // e: () -> Data (マージの単位元)
 // apply_edge: (Data, int from, int to, Cost cost) -> Data (辺の伝搬)
 // add_node: (Data, int v) -> Data (頂点 v の値を反映する。葉は add_node(e(), v) になる)
-namespace rerooting_internal {
-  template <typename Data>
-  inline Data default_add_node(Data d, int) { return d; }
-}
-
 template <typename Cost, typename Data,
           Data (*merge)(Data, Data),
           Data (*e)(),
           Data (*apply_edge)(Data, int, int, Cost),
           Data (*add_node)(Data, int) = rerooting_internal::default_add_node<Data>>
-struct RerootingTree : Graph<Cost> {
+struct RerootingTree : rerooting_internal::Graph<Cost> {
   vector<Data> dp;     // 各頂点を根としたときの木全体の答え
   vector<Data> sub_dp; // dfs1 における部分木の答え
 
-  RerootingTree(int n = 0) : Graph<Cost>(n) {}
+  RerootingTree(int n = 0) : rerooting_internal::Graph<Cost>(n) {}
 
   vector<Data> run(int root = 0) {
     int n = this->size();
@@ -153,7 +155,7 @@ struct RerootingTree : Graph<Cost> {
 private:
   void dfs1(int c, int p) {
     Data res = e();
-    for (Edge<Cost> &d : (*this)[c]) {
+    for (rerooting_internal::Edge<Cost> &d : (*this)[c]) {
       if (d == p) continue;
       dfs1(d, c);
       res = merge(res, apply_edge(sub_dp[d], d, c, d.cost));
@@ -166,7 +168,7 @@ private:
     vector<Data> ds;
     ds.reserve(deg);
 
-    for (Edge<Cost> &d : (*this)[c]) {
+    for (rerooting_internal::Edge<Cost> &d : (*this)[c]) {
       if (d == p) {
         ds.push_back(val_from_parent);
       } else {
@@ -186,7 +188,7 @@ private:
     dp[c] = add_node(head[sz], c);
 
     for (int i = 0; i < sz; i++) {
-      Edge<Cost> &d = (*this)[c][i];
+      rerooting_internal::Edge<Cost> &d = (*this)[c][i];
       if (d == p) continue;
       Data without_d = merge(head[i], tail[i + 1]);
       Data to_child = apply_edge(add_node(without_d, c), c, d, d.cost);

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <numeric>
 #include <random>
 #include <utility>
@@ -216,14 +217,14 @@ inline long long count_divisors(long long n) {
   return ans;
 }
 
-// 約数の総和 sigma(n)
-inline long long sum_divisors(long long n) {
+// 約数の総和 sigma(n) (__int128 版: n <= 10^18 の高度合成数でも安全)
+inline __int128 sum_divisors_128(long long n) {
   if (n <= 0)
     return 0;
   auto pairs = prime_factorize(n);
-  long long ans = 1;
+  __int128 ans = 1;
   for (const auto &[p, exp] : pairs) {
-    long long cur = 1, mult = 1;
+    __int128 cur = 1, mult = 1;
     for (int i = 0; i < exp; i++) {
       mult *= p;
       cur += mult;
@@ -231,6 +232,13 @@ inline long long sum_divisors(long long n) {
     ans *= cur;
   }
   return ans;
+}
+
+// 約数の総和 sigma(n)
+inline long long sum_divisors(long long n) {
+  __int128 ans = sum_divisors_128(n);
+  assert(ans <= (__int128)numeric_limits<long long>::max());
+  return (long long)ans;
 }
 
 // オイラーのトーシェント関数 phi(n) (n と互いに素な 1 以上 n 以下の整数の個数)
@@ -269,7 +277,8 @@ struct PrimeSieve {
 
   // O(1) 素数判定
   bool is_prime(int x) const {
-    assert(1 <= x && x <= n);
+    if (x < 2 || x > n)
+      return false;
     return min_factor_table[x] == x;
   }
 
@@ -384,7 +393,7 @@ inline vector<long long> segmented_sieve(long long L, long long R) {
     return {};
 
   long long sqrt_R = 1;
-  while ((sqrt_R + 1) * (sqrt_R + 1) < R)
+  while ((__int128)(sqrt_R + 1) * (__int128)(sqrt_R + 1) < (__int128)R)
     sqrt_R++;
 
   vector<bool> is_prime_small(sqrt_R + 1, true);
@@ -400,11 +409,11 @@ inline vector<long long> segmented_sieve(long long L, long long R) {
 
   vector<bool> is_prime_range(R - L, true);
   for (long long p : small_primes) {
-    long long start = ((L + p - 1) / p) * p;
-    if (start < p * p)
-      start = p * p;
-    for (long long j = start; j < R; j += p) {
-      is_prime_range[j - L] = false;
+    __int128 start = ((__int128)L + p - 1) / p * p;
+    if (start < (__int128)p * p)
+      start = (__int128)p * p;
+    for (__int128 j = start; j < (__int128)R; j += p) {
+      is_prime_range[(size_t)(j - L)] = false;
     }
   }
 

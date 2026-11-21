@@ -101,18 +101,23 @@ template <typename T = long long> struct TreeDiameter {
 
   T run(int root = 0) { return build(root); }
 
-  // 木の中心 (直径パスの中央に位置する 1 個または 2 個の頂点)
+  // 木の中心 (重み付き偏心度最小の頂点群、重みなしなら中央の 1〜2 頂点)
   vector<int> get_centers() {
     if (n == 0)
       return {};
-    if (path.empty())
+    if (path.empty() || dist_u.empty() || dist_v.empty())
       build();
-    int sz = (int)path.size();
-    if (sz % 2 == 1) {
-      return {path[sz / 2]};
-    } else {
-      return {path[sz / 2 - 1], path[sz / 2]};
+    T min_ecc = eccentricity(path[0]);
+    for (int x : path) {
+      min_ecc = min(min_ecc, eccentricity(x));
     }
+    vector<int> centers;
+    for (int x : path) {
+      if (eccentricity(x) == min_ecc) {
+        centers.push_back(x);
+      }
+    }
+    return centers;
   }
 
   // 任意の頂点 x から最も遠い頂点までの距離 O(1) (全頂点の木の高さ)
@@ -135,6 +140,8 @@ template <typename T = long long> struct TreeDiameter {
       diameter = 0;
       u = v = -1;
       path.clear();
+      dist_u.clear();
+      dist_v.clear();
       return 0;
     }
     assert(0 <= root && root < n);
@@ -169,25 +176,18 @@ template <typename T = long long> struct TreeDiameter {
     };
     dfs(dfs, root, -1);
 
-    // u -> v パス復元 (u から親を記録)
-    vector<int> par_u(n, -1);
-    vector<uint8_t> vis(n, 0);
-    queue<int> q;
-    vis[u] = 1;
-    q.push(u);
-    while (!q.empty()) {
-      int cur = q.front();
-      q.pop();
-      if (cur == v)
-        break;
-      for (const auto &e : g[cur]) {
-        if (!vis[e.to]) {
-          vis[e.to] = 1;
-          par_u[e.to] = cur;
-          q.push(e.to);
-        }
-      }
-    }
+    // u -> v パス復元 (u から親を記録) & dist_u, dist_v 更新
+    auto [far_u, max_du, par_u, du] = farthest(u);
+    (void)far_u;
+    (void)max_du;
+    dist_u = std::move(du);
+
+    auto [far_v, max_dv, par_v, dv] = farthest(v);
+    (void)far_v;
+    (void)max_dv;
+    (void)par_v;
+    dist_v = std::move(dv);
+
     path.clear();
     for (int cur = v; cur != -1; cur = par_u[cur]) {
       path.push_back(cur);

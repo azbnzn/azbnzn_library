@@ -24,7 +24,9 @@ template <typename T = long long> struct MapTrie {
   }
 
   // 【操作1】既存の数列(parent_id)の末尾に値(val)を追加し、新しい数列(new_id)とする
+  // ※ O(log K) を保つため pass は終端ノード nex_node のみ加算する (prefix 全体には加算しない)
   void append(int parent_id, T val, int new_id) {
+    assert(new_id >= 0);
     assert(0 <= parent_id && parent_id < (int)id_to_node.size());
     int cur = id_to_node[parent_id];
     assert(cur != -1);
@@ -49,6 +51,7 @@ template <typename T = long long> struct MapTrie {
 
   // 【操作2】配列を丸ごと追加する（普通のTrie木としての使い方）
   void insert(const vector<T> &seq, int seq_id) {
+    assert(seq_id >= 0);
     int cur = 0;
     nodes[0].pass++;
     for (const auto &val : seq) {
@@ -100,11 +103,13 @@ struct Trie {
 
   vector<Node> nodes;
   int root = 0;
+  bool built = false;
 
   Trie() { nodes.emplace_back(); }
 
   // 文字列パターンの追加
   void add(const string &s) {
+    built = false;
     int id = 0;
     for (char c : s) {
       assert('a' <= c && c <= 'z');
@@ -125,7 +130,10 @@ struct Trie {
     queue<int> que;
     for (int i = 0; i < 26; i++) {
       if (nodes[0].next[i] != -1) {
-        que.push(nodes[0].next[i]);
+        int v = nodes[0].next[i];
+        nodes[v].isOk &= nodes[0].isOk;
+        nodes[v].count += nodes[0].count;
+        que.push(v);
       } else {
         nodes[0].next[i] = 0;
       }
@@ -147,10 +155,14 @@ struct Trie {
         }
       }
     }
+    built = true;
   }
 
   // 文字列 text 内に登録されたいずれかのパターンが含まれているか判定
   bool contains_any(const string &text) const {
+    assert(built);
+    if (!nodes[0].isOk)
+      return true;
     int now = 0;
     for (char c : text) {
       if (c < 'a' || c > 'z') {

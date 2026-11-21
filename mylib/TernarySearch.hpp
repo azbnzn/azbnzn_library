@@ -89,11 +89,12 @@ inline auto ternary_search_min_pair_int(Int1 low_in, Int2 high_in, F f) {
   }
   Int best_x = low;
   auto best_val = f(low);
-  for (Int x = low + 1; x <= high; ++x) {
-    auto val = f(x);
+  for (__int128 x = (__int128)low + 1; x <= (__int128)high; ++x) {
+    Int xi = (Int)x;
+    auto val = f(xi);
     if (val < best_val) {
       best_val = val;
-      best_x = x;
+      best_x = xi;
     }
   }
   return make_pair(best_x, best_val);
@@ -123,11 +124,12 @@ inline auto ternary_search_max_pair_int(Int1 low_in, Int2 high_in, F f) {
   }
   Int best_x = low;
   auto best_val = f(low);
-  for (Int x = low + 1; x <= high; ++x) {
-    auto val = f(x);
+  for (__int128 x = (__int128)low + 1; x <= (__int128)high; ++x) {
+    Int xi = (Int)x;
+    auto val = f(xi);
     if (val > best_val) {
       best_val = val;
-      best_x = x;
+      best_x = xi;
     }
   }
   return make_pair(best_x, best_val);

@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <deque>
 #include <optional>
 #include <string>
@@ -61,6 +62,7 @@ public:
       : n_((int)g.size()), adj_(g.size()) {
     for (int u = 0; u < n_; ++u) {
       for (const auto &p : g[u]) {
+        assert(p.second == 0 || p.second == 1);
         add_edge(u, p.first, (int)p.second);
       }
     }
@@ -225,8 +227,8 @@ zero_one_bfs_with_path(const vector<vector<pair<int, W>>> &g, int start = 0) {
       continue;
     for (const auto &edge : g[u]) {
       int to = edge.first;
+      assert(edge.second == 0 || edge.second == 1);
       int w = (int)edge.second;
-      assert(w == 0 || w == 1);
       long long nc = c + w;
       if (dist[to] == -1 || nc < dist[to]) {
         dist[to] = nc;
@@ -277,10 +279,13 @@ inline vector<vector<T>> zero_one_bfs_grid(int h, int w,
       int ny = y + dy8[k];
       if (nx < 0 || nx >= h || ny < 0 || ny >= w)
         continue;
-      int w_step = (int)step_cost(x, y, nx, ny);
-      if (w_step < 0)
-        continue;
-      assert(w_step == 0 || w_step == 1);
+      auto raw_step = step_cost(x, y, nx, ny);
+      if constexpr (is_signed_v<decltype(raw_step)>) {
+        if (raw_step < 0)
+          continue;
+      }
+      assert(raw_step == 0 || raw_step == 1);
+      int w_step = (int)raw_step;
       T nc = c + (T)w_step;
       if (dist[nx][ny] == (T)-1 || nc < dist[nx][ny]) {
         dist[nx][ny] = nc;

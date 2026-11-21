@@ -25,7 +25,7 @@ template <class S, S (*op)(S, S), S (*e)()> struct PersistentSegTree {
   vector<Node> pool;
 
   PersistentSegTree() : n(0) {}
-  PersistentSegTree(int n) : n(n) {}
+  PersistentSegTree(int n) : n(n) { assert(n >= 0); }
 
   // 初期配列 v から初期バージョン (根ノードID) を O(N) で構築
   int build(const vector<S> &v) {
@@ -37,6 +37,7 @@ template <class S, S (*op)(S, S), S (*e)()> struct PersistentSegTree {
 
   // 空 (すべて e()) の初期バージョン (根ノードID) を作成
   int build_empty(int size) {
+    assert(size >= 0);
     n = size;
     if (n == 0)
       return -1;
@@ -81,7 +82,10 @@ template <class S, S (*op)(S, S), S (*e)()> struct PersistentSegTree {
   // 区間 [0, n) の中で k 番目 (0-indexed: 0 <= k < total_count) のインデックスを O(log N) で見つける
   // ※ S が数値カウント型 (加算が op) であることを前提とします
   int kth_element(int root_l, int root_r, S k) const {
+    assert(n > 0);
     assert(k >= 0);
+    S total = all_prod(root_r) - all_prod(root_l);
+    assert(k < total);
     return kth_element_rec(root_l, root_r, 0, n, k);
   }
 
@@ -118,7 +122,7 @@ private:
     if (r - l == 1) {
       return new_node(v[l]);
     }
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     int lc = build_rec(l, m, v);
     int rc = build_rec(m, r, v);
     return new_node(op(pool[lc].val, pool[rc].val), lc, rc);
@@ -128,7 +132,7 @@ private:
     if (r - l == 1) {
       return new_node(e());
     }
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     int lc = build_empty_rec(l, m);
     int rc = build_empty_rec(m, r);
     return new_node(e(), lc, rc);
@@ -138,7 +142,7 @@ private:
     if (r - l == 1) {
       return new_node(x);
     }
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     int lc = (u == -1 ? -1 : pool[u].left);
     int rc = (u == -1 ? -1 : pool[u].right);
     if (p < m) {
@@ -156,7 +160,7 @@ private:
       S cur = (u == -1 ? e() : pool[u].val);
       return new_node(op(cur, x));
     }
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     int lc = (u == -1 ? -1 : pool[u].left);
     int rc = (u == -1 ? -1 : pool[u].right);
     if (p < m) {
@@ -174,7 +178,7 @@ private:
       return e();
     if (r - l == 1)
       return pool[u].val;
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     if (p < m)
       return get_rec(pool[u].left, l, m, p);
     else
@@ -186,7 +190,7 @@ private:
       return e();
     if (ql <= l && r <= qr)
       return pool[u].val;
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     return op(prod_rec(pool[u].left, l, m, ql, qr),
               prod_rec(pool[u].right, m, r, ql, qr));
   }
@@ -194,7 +198,7 @@ private:
   int kth_element_rec(int ul, int ur, int l, int r, S k) const {
     if (r - l == 1)
       return l;
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     int l_left = (ul == -1 ? -1 : pool[ul].left);
     int r_left = (ur == -1 ? -1 : pool[ur].left);
     S cnt_l = (l_left == -1 ? e() : pool[l_left].val);
@@ -224,7 +228,7 @@ private:
       if (r - l == 1)
         return l;
     }
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     int res = max_right_rec(pool[u].left, l, m, ql, f, current);
     if (res < m)
       return res;
@@ -246,7 +250,7 @@ private:
       if (r - l == 1)
         return r;
     }
-    int m = (l + r) / 2;
+    int m = l + (r - l) / 2;
     int res = min_left_rec(pool[u].right, m, r, qr, f, current);
     if (res > m)
       return res;

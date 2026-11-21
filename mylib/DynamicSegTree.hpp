@@ -32,7 +32,10 @@ template <class S, S (*op)(S, S), S (*e)()> struct DynamicSegTree {
   DynamicSegTree(Index max_range = (1LL << 30))
       : DynamicSegTree(0, max_range) {}
 
-  DynamicSegTree(Index l, Index r) : L(l), R(r) { clear(); }
+  DynamicSegTree(Index l, Index r) : L(l), R(r) {
+    assert(l <= r);
+    clear();
+  }
 
   void clear() {
     pool.clear();
@@ -92,17 +95,26 @@ template <class S, S (*op)(S, S), S (*e)()> struct DynamicSegTree {
   int size() const { return pool.size(); }
 
 private:
+  static inline bool is_unit(Index l, Index r) {
+    return static_cast<uint64_t>(r) - static_cast<uint64_t>(l) == 1ULL;
+  }
+
+  static inline Index midpoint(Index l, Index r) {
+    uint64_t diff = static_cast<uint64_t>(r) - static_cast<uint64_t>(l);
+    return static_cast<Index>(static_cast<uint64_t>(l) + (diff >> 1));
+  }
+
   int new_node() {
     pool.emplace_back(e());
     return (int)pool.size() - 1;
   }
 
   void set(int u, Index l, Index r, Index p, S x) {
-    if (r - l == 1) {
+    if (is_unit(l, r)) {
       pool[u].val = x;
       return;
     }
-    Index m = l + ((r - l) >> 1);
+    Index m = midpoint(l, r);
     if (p < m) {
       if (pool[u].left == -1) {
         int nxt = new_node();
@@ -120,11 +132,11 @@ private:
   }
 
   void apply(int u, Index l, Index r, Index p, S x) {
-    if (r - l == 1) {
+    if (is_unit(l, r)) {
       pool[u].val = op(pool[u].val, x);
       return;
     }
-    Index m = l + ((r - l) >> 1);
+    Index m = midpoint(l, r);
     if (p < m) {
       if (pool[u].left == -1) {
         int nxt = new_node();
@@ -144,9 +156,9 @@ private:
   S get(int u, Index l, Index r, Index p) const {
     if (u == -1)
       return e();
-    if (r - l == 1)
+    if (is_unit(l, r))
       return pool[u].val;
-    Index m = l + ((r - l) >> 1);
+    Index m = midpoint(l, r);
     if (p < m)
       return get(pool[u].left, l, m, p);
     else
@@ -158,7 +170,7 @@ private:
       return e();
     if (ql <= l && r <= qr)
       return pool[u].val;
-    Index m = l + ((r - l) >> 1);
+    Index m = midpoint(l, r);
     return op(prod(pool[u].left, l, m, ql, qr),
               prod(pool[u].right, m, r, ql, qr));
   }
@@ -183,10 +195,10 @@ private:
         current = nxt;
         return r;
       }
-      if (r - l == 1)
+      if (is_unit(l, r))
         return l;
     }
-    Index m = l + ((r - l) >> 1);
+    Index m = midpoint(l, r);
     Index res = max_right(pool[u].left, l, m, ql, f, current);
     if (res < m)
       return res;
@@ -206,10 +218,10 @@ private:
         current = nxt;
         return l;
       }
-      if (r - l == 1)
+      if (is_unit(l, r))
         return r;
     }
-    Index m = l + ((r - l) >> 1);
+    Index m = midpoint(l, r);
     Index res = min_left(pool[u].right, m, r, qr, f, current);
     if (res > m)
       return res;

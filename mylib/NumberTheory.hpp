@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <numeric>
 #include <random>
 #include <utility>
@@ -51,6 +52,8 @@ inline long long extgcd(long long a, long long b, long long &x, long long &y) {
 
 // モジュラ逆元 (gcd(a, mod) == 1 を前提とする)
 inline long long mod_inv(long long a, long long mod) {
+  assert(mod >= 1);
+  a = (a % mod + mod) % mod;
   long long x, y;
   long long g = extgcd(a, mod, x, y);
   assert(g == 1);
@@ -124,7 +127,9 @@ inline uint64_t find_factor(uint64_t n) {
     uint64_t y = x;
     uint64_t d = 1;
 
-    auto f = [&](uint64_t v) { return (mul_mod(v, v, n) + c) % n; };
+    auto f = [&](uint64_t v) {
+      return (uint64_t)(((__uint128_t)mul_mod(v, v, n) + c) % n);
+    };
 
     while (d == 1) {
       x = f(x);
@@ -289,11 +294,18 @@ inline pair<long long, long long> crt(const vector<long long> &r,
     long long u1 = m1 / g;
     if ((r1 - r0) % g != 0)
       return {0, 0};
-    long long x = (r1 - r0) / g % u1 * im % u1;
-    r0 += x * m0;
-    m0 *= u1;
+    __int128 diff = ((__int128)r1 - (__int128)r0) / g % u1;
+    if (diff < 0)
+      diff += u1;
+    __int128 im_pos = ((__int128)im % u1 + u1) % u1;
+    __int128 x = diff * im_pos % u1;
+    __int128 next_m0 = (__int128)m0 * u1;
+    assert(next_m0 <= (__int128)numeric_limits<long long>::max());
+    __int128 next_r0 = (__int128)r0 + x * (__int128)m0;
+    r0 = (long long)(next_r0 % next_m0);
     if (r0 < 0)
-      r0 += m0;
+      r0 += (long long)next_m0;
+    m0 = (long long)next_m0;
   }
   return {r0, m0};
 }

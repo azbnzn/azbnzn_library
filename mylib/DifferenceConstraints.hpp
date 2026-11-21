@@ -86,10 +86,17 @@ template <typename T = long long> struct DifferenceConstraints {
   };
 
 private:
+  using CalcT =
+      conditional_t<is_integral_v<T> && sizeof(T) <= 8, __int128_t, T>;
+  static constexpr CalcT CALC_INF = dc_internal::Limits<CalcT>::max_val() / 2;
+  static constexpr CalcT CALC_NEG_INF =
+      dc_internal::Limits<CalcT>::min_val() / 2;
+
   int n_; // 頂点 0..n-1 が変数、頂点 n が基準変数 x_zero (= 0)
   T eps_;
   bool has_negative_edge_ = false;
   vector<Edge> edges_;
+  vector<CalcT> edge_costs_;
   vector<vector<pair<int, int>>> adj_;     // adj_[u] = {{v, edge_id}, ...}
   vector<vector<pair<int, int>>> rev_adj_; // rev_adj_[v] = {{u, edge_id}, ...}
 
@@ -103,55 +110,89 @@ private:
   int last_source_ = -1;
   bool last_reversed_ = false;
   int last_cycle_node_ = -1;
+  bool last_overflow_ = false;
 
-  void add_edge_internal(int from, int to, T cost) {
+  T clamp_to_T(CalcT val, bool &overflowed) const {
+    if constexpr (is_integral_v<T> && sizeof(T) <= 8) {
+      constexpr CalcT max_val = (CalcT)dc_internal::Limits<T>::max_val();
+      constexpr CalcT min_val = (CalcT)dc_internal::Limits<T>::min_val();
+      if (val > max_val) {
+        overflowed = true;
+        return dc_internal::Limits<T>::max_val();
+      }
+      if (val < min_val) {
+        overflowed = true;
+        return dc_internal::Limits<T>::min_val();
+      }
+      return (T)val;
+    } else {
+      return val;
+    }
+  }
+
+  void add_edge_internal(int from, int to, CalcT cost) {
     assert(0 <= from && from <= n_ && 0 <= to && to <= n_);
-    if (cost < (T)0)
+    if (cost < (CalcT)0)
       has_negative_edge_ = true;
+    bool unused = false;
+    T stored_cost = clamp_to_T(cost, unused);
     int id = (int)edges_.size();
-    edges_.push_back({from, to, cost});
+    edges_.push_back({from, to, stored_cost});
+    edge_costs_.push_back(cost);
     adj_[from].push_back({to, id});
     rev_adj_[to].push_back({from, id});
   }
 
-  pair<T, bool> add_clamped(T d, T cost) const {
-    if constexpr (is_integral_v<T> && sizeof(T) <= 8) {
-      __int128 res = (__int128)d + (__int128)cost;
-      if (res <= (__int128)NEG_INF)
-        return {NEG_INF, true};
-      if (res >= (__int128)INF)
-        return {INF, true};
-      return {(T)res, false};
-    } else if constexpr (is_same_v<T, __int128_t>) {
-      if (cost < 0 && d < NEG_INF - cost)
-        return {NEG_INF, true};
-      if (cost > 0 && d > INF - cost)
-        return {INF, true};
-      T res = d + cost;
-      if (res <= NEG_INF)
-        return {NEG_INF, true};
-      if (res >= INF)
-        return {INF, true};
+  pair<CalcT, bool> add_clamped_calc(CalcT d, CalcT cost) const {
+    if constexpr (is_integral_v<T> || is_same_v<CalcT, __int128_t>) {
+      if (cost < 0 && d < CALC_NEG_INF - cost)
+        return {CALC_NEG_INF, true};
+      if (cost > 0 && d > CALC_INF - cost)
+        return {CALC_INF, true};
+      CalcT res = d + cost;
+      if (res <= CALC_NEG_INF)
+        return {CALC_NEG_INF, true};
+      if (res >= CALC_INF)
+        return {CALC_INF, true};
       return {res, false};
     } else {
-      T res = d + cost;
-      if (res <= NEG_INF)
-        return {NEG_INF, true};
-      if (res >= INF)
-        return {INF, true};
+      CalcT res = d + cost;
+      if (res <= CALC_NEG_INF)
+        return {CALC_NEG_INF, true};
+      if (res >= CALC_INF)
+        return {CALC_INF, true};
       return {res, false};
     }
   }
 
-  bool is_better(T cand, T cur) const { return cand < cur - eps_; }
+  bool is_better_calc(CalcT cand, CalcT cur) const {
+    return cand < cur - (CalcT)eps_;
+  }
+
+  void copy_dists_to_T(const vector<CalcT> &calc_dist,
+                       const vector<uint8_t> &reached) {
+    int total = n_ + 1;
+    dist_.assign(total, INF);
+    for (int i = 0; i < total; ++i) {
+      if (reached[i]) {
+        if (calc_dist[i] <= CALC_NEG_INF) {
+          dist_[i] = NEG_INF;
+        } else if (calc_dist[i] >= CALC_INF) {
+          dist_[i] = INF;
+        } else {
+          dist_[i] = clamp_to_T(calc_dist[i], last_overflow_);
+        }
+      }
+    }
+  }
 
   // 全頂点 0..n_ から一斉開始する実行可能性判定 (ポテンシャル p も生成)
-  bool run_all_sources_core(bool use_spfa, vector<T> &out_dist,
+  bool run_all_sources_core(bool use_spfa, vector<CalcT> &out_dist,
                             vector<uint8_t> &out_reached,
                             vector<int> &out_parent,
                             int &out_cycle_node, Algorithm &out_algo) const {
     int total = n_ + 1;
-    out_dist.assign(total, (T)0);
+    out_dist.assign(total, (CalcT)0);
     out_reached.assign(total, 1);
     out_parent.assign(total, -1);
     out_cycle_node = -1;
@@ -187,14 +228,14 @@ private:
         in_q[u] = 0;
 
         for (auto [v, eid] : adj_[u]) {
-          auto [cand, clamped] = add_clamped(out_dist[u], edges_[eid].cost);
-          if (clamped && cand <= NEG_INF) {
-            out_dist[v] = NEG_INF;
+          auto [cand, clamped] = add_clamped_calc(out_dist[u], edge_costs_[eid]);
+          if (clamped && cand <= CALC_NEG_INF) {
+            out_dist[v] = CALC_NEG_INF;
             out_parent[v] = u;
             out_cycle_node = v;
             return false;
           }
-          if (is_better(cand, out_dist[v])) {
+          if (is_better_calc(cand, out_dist[v])) {
             out_dist[v] = cand;
             out_parent[v] = u;
             path_len[v] = path_len[u] + 1;
@@ -226,22 +267,23 @@ private:
       if (q.empty())
         return true;
       // rounds >= total で抜けた場合は決定論的ベルマンフォードへフォールバック
-      out_dist.assign(total, (T)0);
+      out_dist.assign(total, (CalcT)0);
       out_parent.assign(total, -1);
     }
 
     out_algo = BELLMAN_FORD;
     for (int it = 0; it < total; ++it) {
       bool updated = false;
-      for (const auto &e : edges_) {
-        auto [cand, clamped] = add_clamped(out_dist[e.from], e.cost);
-        if (clamped && cand <= NEG_INF) {
-          out_dist[e.to] = NEG_INF;
+      for (size_t eid = 0; eid < edges_.size(); ++eid) {
+        const auto &e = edges_[eid];
+        auto [cand, clamped] = add_clamped_calc(out_dist[e.from], edge_costs_[eid]);
+        if (clamped && cand <= CALC_NEG_INF) {
+          out_dist[e.to] = CALC_NEG_INF;
           out_parent[e.to] = e.from;
           out_cycle_node = e.to;
           return false;
         }
-        if (is_better(cand, out_dist[e.to])) {
+        if (is_better_calc(cand, out_dist[e.to])) {
           out_dist[e.to] = cand;
           out_parent[e.to] = e.from;
           updated = true;
@@ -259,37 +301,44 @@ private:
 
   // 単一始点 start から最短経路を実行 (元グラフまたは反転グラフ)
   // ※ 事前に負閉路がない (feasible) グラフ上で呼ぶこと
-  void run_sssp(int start, bool reversed, bool use_spfa, vector<T> &out_dist,
+  void run_sssp(int start, bool reversed, bool use_spfa, vector<CalcT> &out_dist,
                 vector<uint8_t> &out_reached, vector<int> &out_parent,
-                Algorithm &out_algo) const {
+                bool &out_clamped, Algorithm &out_algo) const {
     int total = n_ + 1;
-    out_dist.assign(total, INF);
+    out_dist.assign(total, CALC_INF);
     out_reached.assign(total, 0);
     out_parent.assign(total, -1);
+    out_clamped = false;
 
     const auto &g = reversed ? rev_adj_ : adj_;
     out_dist[start] = 0;
     out_reached[start] = 1;
+    vector<uint8_t> node_clamped(total, 0);
 
     if (!has_negative_edge_) {
       out_algo = DIJKSTRA;
-      using P = pair<T, int>;
+      using P = pair<CalcT, int>;
       priority_queue<P, vector<P>, greater<P>> pq;
-      pq.push({(T)0, start});
+      pq.push({(CalcT)0, start});
       while (!pq.empty()) {
         auto [c, u] = pq.top();
         pq.pop();
         if (c > out_dist[u])
           continue;
         for (auto [v, eid] : g[u]) {
-          auto [nc, _] = add_clamped(c, edges_[eid].cost);
-          if (!out_reached[v] || is_better(nc, out_dist[v])) {
+          auto [nc, clamped] = add_clamped_calc(c, edge_costs_[eid]);
+          if (!out_reached[v] || is_better_calc(nc, out_dist[v])) {
             out_reached[v] = 1;
             out_dist[v] = nc;
             out_parent[v] = u;
+            node_clamped[v] = clamped ? 1 : 0;
             pq.push({nc, v});
           }
         }
+      }
+      for (int i = 0; i < total; ++i) {
+        if (out_reached[i] && node_clamped[i])
+          out_clamped = true;
       }
       return;
     }
@@ -308,11 +357,12 @@ private:
         q.pop();
         in_q[u] = 0;
         for (auto [v, eid] : g[u]) {
-          auto [nc, _] = add_clamped(out_dist[u], edges_[eid].cost);
-          if (!out_reached[v] || is_better(nc, out_dist[v])) {
+          auto [nc, clamped] = add_clamped_calc(out_dist[u], edge_costs_[eid]);
+          if (!out_reached[v] || is_better_calc(nc, out_dist[v])) {
             out_reached[v] = 1;
             out_dist[v] = nc;
             out_parent[v] = u;
+            node_clamped[v] = clamped ? 1 : 0;
             if (!in_q[v]) {
               q.push(v);
               in_q[v] = 1;
@@ -328,11 +378,17 @@ private:
           }
         }
       }
-      if (q.empty())
+      if (q.empty()) {
+        for (int i = 0; i < total; ++i) {
+          if (out_reached[i] && node_clamped[i])
+            out_clamped = true;
+        }
         return;
-      out_dist.assign(total, INF);
+      }
+      out_dist.assign(total, CALC_INF);
       out_reached.assign(total, 0);
       out_parent.assign(total, -1);
+      node_clamped.assign(total, 0);
       out_dist[start] = 0;
       out_reached[start] = 1;
     }
@@ -340,48 +396,88 @@ private:
     out_algo = BELLMAN_FORD;
     for (int it = 0; it < total; ++it) {
       bool updated = false;
-      for (const auto &e : edges_) {
+      for (size_t eid = 0; eid < edges_.size(); ++eid) {
+        const auto &e = edges_[eid];
         int u = reversed ? e.to : e.from;
         int v = reversed ? e.from : e.to;
         if (!out_reached[u])
           continue;
-        auto [nc, _] = add_clamped(out_dist[u], e.cost);
-        if (!out_reached[v] || is_better(nc, out_dist[v])) {
+        auto [nc, clamped] = add_clamped_calc(out_dist[u], edge_costs_[eid]);
+        if (!out_reached[v] || is_better_calc(nc, out_dist[v])) {
           out_reached[v] = 1;
           out_dist[v] = nc;
           out_parent[v] = u;
+          node_clamped[v] = clamped ? 1 : 0;
           updated = true;
         }
       }
       if (!updated)
         break;
     }
+    for (int i = 0; i < total; ++i) {
+      if (out_reached[i] && node_clamped[i])
+        out_clamped = true;
+    }
   }
 
   // 到達可能部の最短路 d と全体ポテンシャル p を合成し、全変数が制約を満たす完全解を作る
-  void build_completed_solution(const vector<T> &d,
+  void build_completed_solution(const vector<CalcT> &d,
                                 const vector<uint8_t> &reached,
-                                const vector<T> &p) {
-    using W_T = conditional_t<is_integral_v<T> && sizeof(T) <= 8, __int128_t, T>;
+                                const vector<CalcT> &p) {
     bool has_c = false;
-    W_T shift_c = 0;
-    for (int i = 0; i <= n_; ++i) {
-      if (reached[i]) {
-        W_T cand = (W_T)d[i] - (W_T)p[i];
+    CalcT shift_c = 0;
+    for (size_t eid = 0; eid < edges_.size(); ++eid) {
+      int u = edges_[eid].from;
+      int v = edges_[eid].to;
+      if (!reached[u] && reached[v]) {
+        CalcT cand = d[v] - p[u] - edge_costs_[eid];
         if (!has_c || cand > shift_c) {
           has_c = true;
           shift_c = cand;
         }
       }
     }
-    vector<W_T> x_full(n_ + 1);
+    vector<CalcT> x_full(n_ + 1);
     for (int i = 0; i <= n_; ++i) {
-      x_full[i] = reached[i] ? (W_T)d[i] : ((W_T)p[i] + shift_c);
+      x_full[i] = reached[i] ? d[i] : (p[i] + shift_c);
     }
-    W_T zero_off = x_full[n_];
+    CalcT zero_off = x_full[n_];
     solution_.resize(n_);
     for (int i = 0; i < n_; ++i) {
-      solution_[i] = (T)(x_full[i] - zero_off);
+      solution_[i] = clamp_to_T(x_full[i] - zero_off, last_overflow_);
+    }
+  }
+
+  // 反転グラフ最短路 d_rev と全体ポテンシャル p を合成し、全変数が制約を満たす完全解を作る
+  void build_completed_solution_reversed(const vector<CalcT> &d_rev,
+                                         const vector<uint8_t> &reached_rev,
+                                         const vector<CalcT> &p) {
+    vector<CalcT> neg_d(n_ + 1, 0);
+    for (int i = 0; i <= n_; ++i) {
+      if (reached_rev[i])
+        neg_d[i] = -d_rev[i];
+    }
+    bool has_c = false;
+    CalcT shift_c = 0;
+    for (size_t eid = 0; eid < edges_.size(); ++eid) {
+      int u = edges_[eid].from;
+      int v = edges_[eid].to;
+      if (reached_rev[u] && !reached_rev[v]) {
+        CalcT cand = edge_costs_[eid] + neg_d[u] - p[v];
+        if (!has_c || cand < shift_c) {
+          has_c = true;
+          shift_c = cand;
+        }
+      }
+    }
+    vector<CalcT> x_full(n_ + 1);
+    for (int i = 0; i <= n_; ++i) {
+      x_full[i] = reached_rev[i] ? neg_d[i] : (p[i] + shift_c);
+    }
+    CalcT zero_off = x_full[n_];
+    solution_.resize(n_);
+    for (int i = 0; i < n_; ++i) {
+      solution_[i] = clamp_to_T(x_full[i] - zero_off, last_overflow_);
     }
   }
 
@@ -394,6 +490,7 @@ public:
   int num_variables() const { return n_; }
   int num_constraints() const { return (int)edges_.size(); }
   bool has_negative_edge() const { return has_negative_edge_; }
+  bool has_overflow() const { return last_overflow_; }
   const vector<Edge> &edges() const { return edges_; }
 
   void clear(int new_n = -1) {
@@ -402,6 +499,7 @@ public:
       n_ = new_n;
     }
     edges_.clear();
+    edge_costs_.clear();
     adj_.assign(n_ + 1, {});
     rev_adj_.assign(n_ + 1, {});
     has_negative_edge_ = false;
@@ -414,31 +512,34 @@ public:
     last_source_ = -1;
     last_reversed_ = false;
     last_cycle_node_ = -1;
+    last_overflow_ = false;
   }
 
   // --- 制約の追加 ---
   // x_u - x_v <= w
   void add_diff_leq(int u, int v, T w) {
     assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    add_edge_internal(v, u, w);
+    add_edge_internal(v, u, (CalcT)w);
   }
 
   // x_u - x_v >= w  <=>  x_v - x_u <= -w
   void add_diff_geq(int u, int v, T w) {
     assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    add_edge_internal(u, v, -w);
+    add_edge_internal(u, v, -(CalcT)w);
   }
 
   // x_u - x_v < w (整数型では x_u - x_v <= w - 1)
   void add_diff_lt(int u, int v, T w) {
     static_assert(is_integral_v<T>, "add_diff_lt requires integral type");
-    add_diff_leq(u, v, w - 1);
+    assert(0 <= u && u < n_ && 0 <= v && v < n_);
+    add_edge_internal(v, u, (CalcT)w - 1);
   }
 
   // x_u - x_v > w (整数型では x_u - x_v >= w + 1)
   void add_diff_gt(int u, int v, T w) {
     static_assert(is_integral_v<T>, "add_diff_gt requires integral type");
-    add_diff_geq(u, v, w + 1);
+    assert(0 <= u && u < n_ && 0 <= v && v < n_);
+    add_edge_internal(u, v, -((CalcT)w + 1));
   }
 
   // x_u - x_v == w
@@ -450,13 +551,13 @@ public:
   // x_u <= w  <=>  x_u - x_zero <= w
   void add_bound_leq(int u, T w) {
     assert(0 <= u && u < n_);
-    add_edge_internal(n_, u, w);
+    add_edge_internal(n_, u, (CalcT)w);
   }
 
   // x_u >= w  <=>  x_zero - x_u <= -w
   void add_bound_geq(int u, T w) {
     assert(0 <= u && u < n_);
-    add_edge_internal(u, n_, -w);
+    add_edge_internal(u, n_, -(CalcT)w);
   }
 
   // x_u == w
@@ -474,9 +575,12 @@ public:
   // --- 実行可能性・任意解・最小化/最大化解構成 ---
   // 制約系に矛盾がないか判定 (非負辺のみなら O(1) で true)
   bool is_feasible(bool use_spfa = false) {
+    last_overflow_ = false;
+    vector<CalcT> calc_dist;
     int cyc_node = -1;
-    bool ok = run_all_sources_core(use_spfa, dist_, reached_, parent_, cyc_node,
-                                   last_algo_);
+    bool ok = run_all_sources_core(use_spfa, calc_dist, reached_, parent_,
+                                   cyc_node, last_algo_);
+    copy_dists_to_T(calc_dist, reached_);
     last_source_ = -1;
     last_reversed_ = false;
     last_cycle_node_ = cyc_node;
@@ -486,10 +590,10 @@ public:
       return false;
     }
     last_status_ = FINITE;
-    T zero_val = dist_[n_];
+    CalcT zero_val = calc_dist[n_];
     solution_.resize(n_);
     for (int i = 0; i < n_; ++i) {
-      solution_[i] = dist_[i] - zero_val;
+      solution_[i] = clamp_to_T(calc_dist[i] - zero_val, last_overflow_);
     }
     return true;
   }
@@ -507,18 +611,19 @@ public:
   // 到達可能頂点の最短距離はそのまま dist(i) / dists() / is_reachable(i) で参照可能。
   optional<vector<T>> solve_max(int base = -1, bool use_spfa = false) {
     assert(-1 <= base && base < n_);
+    last_overflow_ = false;
     int s = (base == -1) ? n_ : base;
 
-    vector<T> p;
+    vector<CalcT> p;
     vector<uint8_t> p_reach;
     vector<int> p_par;
     int cyc_node = -1;
     Algorithm feas_algo = NONE;
     if (!run_all_sources_core(use_spfa, p, p_reach, p_par, cyc_node,
                               feas_algo)) {
-      dist_ = std::move(p);
       reached_ = std::move(p_reach);
       parent_ = std::move(p_par);
+      copy_dists_to_T(p, reached_);
       last_algo_ = feas_algo;
       last_cycle_node_ = cyc_node;
       last_source_ = -1;
@@ -528,7 +633,13 @@ public:
       return nullopt;
     }
 
-    run_sssp(s, false, use_spfa, dist_, reached_, parent_, last_algo_);
+    vector<CalcT> calc_dist;
+    bool clamped = false;
+    run_sssp(s, false, use_spfa, calc_dist, reached_, parent_, clamped,
+             last_algo_);
+    if (clamped)
+      last_overflow_ = true;
+    copy_dists_to_T(calc_dist, reached_);
     last_source_ = s;
     last_reversed_ = false;
     last_cycle_node_ = -1;
@@ -542,10 +653,7 @@ public:
     }
 
     last_status_ = FINITE;
-    solution_.resize(n_);
-    for (int i = 0; i < n_; ++i) {
-      solution_[i] = dist_[i];
-    }
+    build_completed_solution(calc_dist, reached_, p);
     return solution_;
   }
 
@@ -555,18 +663,19 @@ public:
   // 到達可能頂点の反転グラフ上最短距離は dist(i) / dists() / is_reachable(i) で参照可能。
   optional<vector<T>> solve_min(int base = -1, bool use_spfa = false) {
     assert(-1 <= base && base < n_);
+    last_overflow_ = false;
     int s = (base == -1) ? n_ : base;
 
-    vector<T> p;
+    vector<CalcT> p;
     vector<uint8_t> p_reach;
     vector<int> p_par;
     int cyc_node = -1;
     Algorithm feas_algo = NONE;
     if (!run_all_sources_core(use_spfa, p, p_reach, p_par, cyc_node,
                               feas_algo)) {
-      dist_ = std::move(p);
       reached_ = std::move(p_reach);
       parent_ = std::move(p_par);
+      copy_dists_to_T(p, reached_);
       last_algo_ = feas_algo;
       last_cycle_node_ = cyc_node;
       last_source_ = -1;
@@ -576,7 +685,13 @@ public:
       return nullopt;
     }
 
-    run_sssp(s, true, use_spfa, dist_, reached_, parent_, last_algo_);
+    vector<CalcT> calc_dist;
+    bool clamped = false;
+    run_sssp(s, true, use_spfa, calc_dist, reached_, parent_, clamped,
+             last_algo_);
+    if (clamped)
+      last_overflow_ = true;
+    copy_dists_to_T(calc_dist, reached_);
     last_source_ = s;
     last_reversed_ = true;
     last_cycle_node_ = -1;
@@ -590,10 +705,7 @@ public:
     }
 
     last_status_ = FINITE;
-    solution_.resize(n_);
-    for (int i = 0; i < n_; ++i) {
-      solution_[i] = -dist_[i];
-    }
+    build_completed_solution_reversed(calc_dist, reached_, p);
     return solution_;
   }
 
@@ -630,16 +742,17 @@ public:
   // dists() で最短経路計算の生距離 (基準 v からの距離) を取得可能になる。
   BoundResult max_diff(int u, int v, bool use_spfa = false) {
     assert(0 <= u && u < n_ && 0 <= v && v < n_);
-    vector<T> p;
+    last_overflow_ = false;
+    vector<CalcT> p;
     vector<uint8_t> p_reach;
     vector<int> p_par;
     int cyc_node = -1;
     Algorithm feas_algo = NONE;
     if (!run_all_sources_core(use_spfa, p, p_reach, p_par, cyc_node,
                               feas_algo)) {
-      dist_ = std::move(p);
       reached_ = std::move(p_reach);
       parent_ = std::move(p_par);
+      copy_dists_to_T(p, reached_);
       last_algo_ = feas_algo;
       last_cycle_node_ = cyc_node;
       last_source_ = -1;
@@ -649,7 +762,13 @@ public:
       return {INFEASIBLE, 0};
     }
 
-    run_sssp(v, false, use_spfa, dist_, reached_, parent_, last_algo_);
+    vector<CalcT> calc_dist;
+    bool clamped = false;
+    run_sssp(v, false, use_spfa, calc_dist, reached_, parent_, clamped,
+             last_algo_);
+    if (clamped)
+      last_overflow_ = true;
+    copy_dists_to_T(calc_dist, reached_);
     last_source_ = v;
     last_reversed_ = false;
     last_cycle_node_ = -1;
@@ -660,20 +779,58 @@ public:
       return {UNBOUNDED, 0};
     }
 
-    build_completed_solution(dist_, reached_, p);
+    build_completed_solution(calc_dist, reached_, p);
     last_status_ = FINITE;
-    return {FINITE, dist_[u]};
+    T ans_val = clamp_to_T(calc_dist[u], last_overflow_);
+    return {FINITE, ans_val};
   }
 
   // 制約のもとでの (x_u - x_v) の最小値を求める: min(x_u - x_v) = -max(x_v - x_u)
   // 同時に solution() でその最小値を達成する完全解 x[0..n-1]、
   // dists() で最短経路計算の生距離 (基準 u からの距離) を取得可能になる。
   BoundResult min_diff(int u, int v, bool use_spfa = false) {
-    BoundResult res = max_diff(v, u, use_spfa);
-    if (res.status == FINITE) {
-      res.value = -res.value;
+    assert(0 <= u && u < n_ && 0 <= v && v < n_);
+    last_overflow_ = false;
+    vector<CalcT> p;
+    vector<uint8_t> p_reach;
+    vector<int> p_par;
+    int cyc_node = -1;
+    Algorithm feas_algo = NONE;
+    if (!run_all_sources_core(use_spfa, p, p_reach, p_par, cyc_node,
+                              feas_algo)) {
+      reached_ = std::move(p_reach);
+      parent_ = std::move(p_par);
+      copy_dists_to_T(p, reached_);
+      last_algo_ = feas_algo;
+      last_cycle_node_ = cyc_node;
+      last_source_ = -1;
+      last_reversed_ = false;
+      last_status_ = INFEASIBLE;
+      solution_.clear();
+      return {INFEASIBLE, 0};
     }
-    return res;
+
+    vector<CalcT> calc_dist;
+    bool clamped = false;
+    run_sssp(u, false, use_spfa, calc_dist, reached_, parent_, clamped,
+             last_algo_);
+    if (clamped)
+      last_overflow_ = true;
+    copy_dists_to_T(calc_dist, reached_);
+    last_source_ = u;
+    last_reversed_ = false;
+    last_cycle_node_ = -1;
+
+    if (!reached_[v]) {
+      last_status_ = UNBOUNDED;
+      solution_.clear();
+      return {UNBOUNDED, 0};
+    }
+
+    build_completed_solution(calc_dist, reached_, p);
+    last_status_ = FINITE;
+    T ans_val = clamp_to_T(-calc_dist[v], last_overflow_);
+    return {FINITE, ans_val};
   }
 
   // --- 直近に実行した解・距離・構成パスの参照 ---
