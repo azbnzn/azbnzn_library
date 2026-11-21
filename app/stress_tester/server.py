@@ -21,6 +21,7 @@ import time
 import threading
 import queue
 import webbrowser
+import argparse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 import concurrent.futures
@@ -649,7 +650,12 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 def main():
-    port = find_free_port(PORT)
+    parser = argparse.ArgumentParser(description="AtCoder Parallel Stress Tester Server")
+    parser.add_argument("--port", type=int, default=None, help="Bind port (default: auto free port starting at 8085)")
+    parser.add_argument("--no-browser", action="store_true", help="Do not open browser automatically")
+    args = parser.parse_args()
+
+    port = args.port if args.port is not None else find_free_port(PORT)
     server_address = ("127.0.0.1", port)
     httpd = ThreadedHTTPServer(server_address, StressHTTPRequestHandler)
 
@@ -662,12 +668,14 @@ def main():
     print(f" [並列] 検出CPUコア数: {cores} コア (最大 {cores} スレッド並列実行)")
     print(" [機能] パイプインメモリ高速実行 / SSE リアルタイム速度メーター / 最小ケース探索")
     print("=" * 68)
-    print(" ブラウザで開いています... (終了するには Ctrl+C を押してください)\n")
-
-    try:
-        webbrowser.open(url)
-    except Exception:
-        pass
+    if args.no_browser:
+        print(" ブラウザ自動起動は無効 (--no-browser)。\n", flush=True)
+    else:
+        print(" ブラウザで開いています... (終了するには Ctrl+C を押してください)\n", flush=True)
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
 
     try:
         httpd.serve_forever()

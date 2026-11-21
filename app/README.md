@@ -18,8 +18,28 @@
 
 ## 🚀 アプリの起動方法
 
-### 1. ランチャーから起動
+### 1. Spotlight / Finder / Dock から起動（ターミナル不要・推奨）
+ネイティブ macOS アプリ **`AtCoder Apps.app`** を使うと、ターミナルを開かずにワンクリックで全アプリを起動できます。
+
+- **Spotlight**: `Cmd + Space` で「`AtCoder Apps`」と入力して Enter
+- **Finder / Launchpad**: `~/Applications/AtCoder Apps.app` または `app/AtCoder Apps.app` をダブルクリック（Dock にドラッグしておけばいつでも1クリックで起動可能）
+
+#### 省電力・オンデマンド設計
+- **待機負荷ゼロ**: macOS のログイン自動起動（LaunchAgent）は使わず、開いていない時は CPU・メモリ消費ともに **0** です。
+- **必要な時だけ起動**: ポータル画面で各アプリの **「開く」** を押した時にだけ対応する Python サーバーを裏で起動します（`grid_visualizer` / `array_graph` は静的配信のため追加プロセス不要）。
+- **個別停止 & 完全終了**: ポータル画面から個別のサーバー停止、`全アプリ停止`、または **`ポータルごと終了`**（全サーバー + ポータル自体を完全停止）ができます。
+
+#### `.app` ランチャーの再ビルド
+環境（Python パスやアイコン等）が変わった場合は以下で再ビルド・再配置できます：
 ```bash
+python3 app/launcher/build_app.py
+```
+
+### 2. CLI ランチャーから起動
+```bash
+# Web ポータルを起動
+python3 app/run.py portal
+
 # アプリ一覧を表示して選択起動
 python3 app/run.py
 
@@ -30,7 +50,7 @@ python3 app/run.py debug   # 競技プログラミング デバッガ (別名: c
 python3 app/run.py stress  # 並列ストレステスター (別名: st, tester)
 ```
 
-### 2. ブラウザで直接開く
+### 3. ブラウザで直接開く
 各Webアプリの `index.html` は単体で完結しているため、ダブルクリックまたはターミナルから即座に開くことができます：
 
 ```bash
@@ -62,4 +82,4 @@ APPLICATIONS = [
     },
 ]
 ```
-これだけで、`python3 app/run.py tree` やメニュー選択から自動で起動・管理できるようになります。
+これだけで、`python3 app/run.py tree` や Web ポータル (`AtCoder Apps.app` / `python3 app/run.py portal`) から自動で起動・管理できるようになります。

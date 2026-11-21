@@ -82,6 +82,14 @@ def main():
         if arg in ["--list", "-l", "list"]:
             list_apps()
             return
+        if arg in ["portal", "web", "hub", "ui"]:
+            import subprocess
+            portal_script = os.path.join(BASE_DIR, "portal.py")
+            try:
+                res = subprocess.run([sys.executable, portal_script, *sys.argv[2:]])
+                sys.exit(res.returncode)
+            except KeyboardInterrupt:
+                return
 
         # ID または エイリアスで検索
         for app in APPLICATIONS:

@@ -18,6 +18,7 @@ import tempfile
 import subprocess
 import time
 import webbrowser
+import argparse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -874,10 +875,15 @@ class DebuggerHTTPRequestHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    port = find_free_port(PORT)
+    parser = argparse.ArgumentParser(description="AtCoder CP Debugger Server")
+    parser.add_argument("--port", type=int, default=None, help="Bind port (default: auto free port starting at 8080)")
+    parser.add_argument("--no-browser", action="store_true", help="Do not open browser automatically")
+    args = parser.parse_args()
+
+    port = args.port if args.port is not None else find_free_port(PORT)
     server_address = ("127.0.0.1", port)
     httpd = ThreadedHTTPServer(server_address, DebuggerHTTPRequestHandler)
-    
+
     url = f"http://127.0.0.1:{port}"
     print("=" * 66)
     print(" ⚡️  AtCoder CP Debugger (競技プログラミング デバッガ)")
@@ -885,12 +891,14 @@ def main():
     print(f" [OK] サーバ起動完了: {url}")
     print(" [機能] バグ行特定 / Clang ASan・UBSan診断 / ストレステスト / トレース")
     print("=" * 66)
-    print(" ブラウザで開いています... (終了するには Ctrl+C を押してください)\n")
-
-    try:
-        webbrowser.open(url)
-    except Exception:
-        pass
+    if args.no_browser:
+        print(" ブラウザ自動起動は無効 (--no-browser)。\n", flush=True)
+    else:
+        print(" ブラウザで開いています... (終了するには Ctrl+C を押してください)\n", flush=True)
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
 
     try:
         httpd.serve_forever()
